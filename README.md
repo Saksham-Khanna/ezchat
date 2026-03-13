@@ -1,5 +1,3 @@
-# <img src="client/public/full-logo.png" alt="QuickChat Logo" width="300" />
-
 Modern real-time chat application with group messaging, profile management, and end-to-end encryption simulation.
 
 ## ✨ Features
