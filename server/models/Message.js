@@ -62,10 +62,24 @@ const messageSchema = new mongoose.Schema({
     ref: 'User',
     default: [],
   },
+  is_disappearing: {
+    type: Boolean,
+    default: false,
+  },
+  disappearing_duration: {
+    type: Number, // duration in seconds
+    default: 0,
+  },
+  expires_at: {
+    type: Date, // For server-side TTL if needed
+  },
   call_duration: {
     type: Number,
     default: 0,
   }
 }, { timestamps: true });
+
+// TTL index for disappearing messages
+messageSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('Message', messageSchema);

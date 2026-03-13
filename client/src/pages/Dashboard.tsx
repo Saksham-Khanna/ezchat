@@ -17,6 +17,8 @@ import RenameRoomModal from "@/components/chat/wifi/RenameRoomModal";
 import WiFiDiscoveryPanel from "@/components/chat/WiFiDiscoveryPanel";
 import RoomMembersPanel from "@/components/chat/wifi/RoomMembersPanel";
 import { SOCKET_URL } from "@/lib/config";
+import { PinLockOverlay } from "@/components/chat/PinLockOverlay";
+import { getConversationKey, encryptMessage, decryptMessage } from "@/lib/encryption";
 
 export interface Friend {
   _id: string; // MongoDB uses _id
@@ -55,6 +57,10 @@ export interface Message {
   is_forwarded?: boolean;
   sender_avatar?: string;
   type?: 'text' | 'system' | 'media' | 'call';
+  is_encrypted?: boolean;
+  is_disappearing?: boolean;
+  disappearing_duration?: number;
+  expires_at?: string;
 }
 
 export interface User {
@@ -64,6 +70,7 @@ export interface User {
   cv_id?: string;
   bio?: string;
   avatar_url?: string;
+  is_pin_enabled?: boolean;
   settings?: {
     theme: string;
     show_read_receipts: boolean;
@@ -113,6 +120,9 @@ const Dashboard = () => {
   const nearbyUsersRef = useRef<any[]>([]);
   const [wifiConnectionStatus, setWifiConnectionStatus] = useState<Map<string, string>>(new Map());
   const [wifiTransferProgress, setWifiTransferProgress] = useState<Map<string, number>>(new Map());
+  const [isLocked, setIsLocked] = useState(false);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [disappearingSettings, setDisappearingSettings] = useState<Map<string, number>>(new Map());
   
   // Call state
   const [callStatus, setCallStatus] = useState<"none" | "calling" | "incoming" | "connected">("none");
@@ -152,15 +162,29 @@ const Dashboard = () => {
     if (!user) return;
     
     // Convert P2P message to existing Message format
+    let finalContent = p2pMsg.content || "";
+    // Only decrypt if it's a direct message (P2P is always direct here)
+    if (!p2pMsg.recipient_id.startsWith('room_')) {
+      const key = getConversationKey(user.id, p2pMsg.sender_id);
+      finalContent = decryptMessage(finalContent, key);
+    }
+
+    const expires_at = p2pMsg.is_disappearing && p2pMsg.disappearing_duration 
+      ? new Date(Date.now() + (p2pMsg.disappearing_duration * 1000)).toISOString() 
+      : undefined;
+
     const newMsg: Message = {
       _id: p2pMsg.message_id || `p2p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       sender_id: p2pMsg.sender_id,
       recipient_id: p2pMsg.recipient_id,
-      content: p2pMsg.content || "",
+      content: finalContent,
       media_url: p2pMsg.media_url,
       media_type: p2pMsg.media_type as any,
       createdAt: p2pMsg.timestamp || new Date().toISOString(),
       status: 'delivered',
+      is_disappearing: p2pMsg.is_disappearing,
+      disappearing_duration: p2pMsg.disappearing_duration,
+      expires_at
     };
 
     if (p2pMsg.type === "typing") {
@@ -254,6 +278,11 @@ const Dashboard = () => {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
       if (parsedUser.settings) setSettings(parsedUser.settings);
+      
+      // Check if PIN lock is needed
+      if (parsedUser.is_pin_enabled) {
+        setIsLocked(true);
+      }
       
       // Apply theme
       document.documentElement.classList.toggle('light-mode', (parsedUser.settings?.theme || 'dark') === 'light');
@@ -487,7 +516,7 @@ const Dashboard = () => {
       });
 
       newSocket.on("wifi_room_deleted", (data) => {
-        setWifiRooms(prev => prev.filter(r => r.room_id !== data.roomId));
+        setJoinedRooms(prev => prev.filter(r => r.room_id !== data.roomId));
       });
 
       newSocket.on("room_error", (data) => {
@@ -496,6 +525,14 @@ const Dashboard = () => {
       
       newSocket.on("receive_message", (data) => {
         console.log("Received a new message via socket:", data);
+        
+        let decryptedContent = data.content;
+        if (data.is_encrypted) {
+           const key = getConversationKey(parsedUser.id, data.sender_id);
+           decryptedContent = decryptMessage(data.content, key);
+           data.content = decryptedContent;
+        }
+
         // Correct logic for handling new messages (direct or room)
         const isCurrentChat = data.sender_id === selectedFriendRef.current?._id || data.recipient_id === selectedFriendRef.current?._id;
         
@@ -895,6 +932,16 @@ const Dashboard = () => {
       fetch(endpoint)
         .then(res => res.json())
         .then(data => {
+          // Decrypt if it's not a room and is encrypted
+          if (!isRoom && selectedFriend) {
+            const key = getConversationKey(user.id, selectedFriend._id);
+            data = data.map((msg: any) => {
+              if (msg.is_encrypted) {
+                return { ...msg, content: decryptMessage(msg.content, key) };
+              }
+              return msg;
+            });
+          }
           setMessages(data);
           
           if (!isRoom && selectedFriend) {
@@ -1161,7 +1208,16 @@ const Dashboard = () => {
 
     // Optimistically add to UI
     setMessages((prev) => [...prev, pendingMsg]);
+    const isRoom = target._id.startsWith('room_');
     const sentText = newMessage;
+    let finalContent = sentText;
+    let e2eeKey = "";
+
+    if (!isRoom) {
+      e2eeKey = getConversationKey(user.id, target._id);
+      finalContent = encryptMessage(sentText, e2eeKey);
+    }
+    
     setNewMessage("");
     const parentId = replyTo?._id;
     setReplyTo(null);
@@ -1171,8 +1227,11 @@ const Dashboard = () => {
       recipient_id: target._id,
       sender_name: user.username,
       sender_avatar: user.avatar_url,
-      content: sentText,
-      reply_to: parentId
+      content: finalContent,
+      reply_to: parentId,
+      is_e2ee: !isRoom,
+      is_disappearing: disappearingSettings.get(target._id) ? true : false,
+      disappearing_duration: disappearingSettings.get(target._id) || 0
     };
 
     if (chatMode === "wifi") {
@@ -1188,9 +1247,11 @@ const Dashboard = () => {
               type: "text",
               sender_id: user.id,
               recipient_id: target._id,
-              content: sentText,
+              content: finalContent,
               message_id: tempId,
-              timestamp: pendingMsg.createdAt
+              timestamp: pendingMsg.createdAt,
+              is_disappearing: messageData.is_disappearing,
+              disappearing_duration: messageData.disappearing_duration
             });
             if (ok) successCount++;
           }
@@ -1201,9 +1262,11 @@ const Dashboard = () => {
           type: "text",
           sender_id: user.id,
           recipient_id: target._id,
-          content: sentText,
+          content: finalContent,
           message_id: tempId,
-          timestamp: pendingMsg.createdAt
+          timestamp: pendingMsg.createdAt,
+          is_disappearing: messageData.is_disappearing,
+          disappearing_duration: messageData.disappearing_duration
         }) || false;
       }
        
@@ -1262,13 +1325,23 @@ const Dashboard = () => {
     if (!target || !user || !socket) return;
 
     const content = caption || "📷 Image";
+    const isRoom = target._id.startsWith('room_');
+    let finalContent = content;
+    if (!isRoom) {
+      const key = getConversationKey(user.id, target._id);
+      finalContent = encryptMessage(content, key);
+    }
+
     const messageData = {
       sender_id: user.id,
       recipient_id: target._id,
       sender_name: user.username,
-      content,
+      content: finalContent,
       media_url: mediaUrl,
       media_type: "image",
+      is_e2ee: !isRoom,
+      is_disappearing: disappearingSettings.get(target._id) ? true : false,
+      disappearing_duration: disappearingSettings.get(target._id) || 0
     };
 
     const tempId = `pending_${Date.now()}`;
@@ -1357,14 +1430,24 @@ const Dashboard = () => {
     if (!target || !user || !socket) return;
 
     const content = caption || "🎥 Video";
+    const isRoom = target._id.startsWith('room_');
+    let finalContent = content;
+    if (!isRoom) {
+      const key = getConversationKey(user.id, target._id);
+      finalContent = encryptMessage(content, key);
+    }
+
     const messageData = {
       sender_id: user.id,
       recipient_id: target._id,
       sender_name: user.username,
       sender_avatar: user.avatar_url,
-      content,
+      content: finalContent,
       media_url: mediaUrl,
       media_type: "video",
+      is_e2ee: !isRoom,
+      is_disappearing: disappearingSettings.get(target._id) ? true : false,
+      disappearing_duration: disappearingSettings.get(target._id) || 0
     };
 
     const tempId = `pending_${Date.now()}`;
@@ -1464,14 +1547,24 @@ const Dashboard = () => {
     };
     setMessages((prev) => [...prev, pendingMsg]);
 
+    const isRoom = target._id.startsWith('room_');
+    let finalContent = content;
+    if (!isRoom) {
+      const key = getConversationKey(user.id, target._id);
+      finalContent = encryptMessage(content, key);
+    }
+
     const messageData = {
       sender_id: user.id,
       recipient_id: target._id,
       sender_name: user.username,
       sender_avatar: user.avatar_url,
-      content,
+      content: finalContent,
       media_url: mediaUrl,
       media_type: "audio",
+      is_e2ee: !isRoom,
+      is_disappearing: disappearingSettings.get(target._id) ? true : false,
+      disappearing_duration: disappearingSettings.get(target._id) || 0
     };
 
     if (chatMode === "wifi") {
@@ -1559,14 +1652,24 @@ const Dashboard = () => {
     };
     setMessages((prev) => [...prev, pendingMsg]);
 
+    const isRoom = target._id.startsWith('room_');
+    let finalContent = content;
+    if (!isRoom) {
+       const key = getConversationKey(user.id, target._id);
+       finalContent = encryptMessage(content, key);
+    }
+
     const messageData = {
       sender_id: user.id,
       recipient_id: target._id,
       sender_name: user.username,
       sender_avatar: user.avatar_url,
-      content,
+      content: finalContent,
       media_url: mediaUrl,
       media_type: "document",
+      is_e2ee: !isRoom,
+      is_disappearing: disappearingSettings.get(target._id) ? true : false,
+      disappearing_duration: disappearingSettings.get(target._id) || 0
     };
 
     if (chatMode === "wifi") {
@@ -2267,6 +2370,72 @@ const Dashboard = () => {
     navigate("/auth");
   };
 
+  const handleVerifyPin = async (pin: string) => {
+    if (!user) return false;
+    try {
+      const resp = await fetch(`${SOCKET_URL}/api/auth/verify-pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, pin }),
+      });
+      if (resp.ok) {
+        setIsLocked(false);
+        setPinVerified(true);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  const handleTogglePin = async (enabled: boolean) => {
+    if (!user) return;
+    try {
+      const resp = await fetch(`${SOCKET_URL}/api/auth/toggle-pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, enabled }),
+      });
+      if (resp.ok) {
+        const updatedUser = { ...user, is_pin_enabled: enabled };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        toast({ title: "Success", description: enabled ? "PIN Protection Enabled" : "PIN Protection Disabled" });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSetPin = async (pin: string) => {
+    if (!user) return false;
+    try {
+      const resp = await fetch(`${SOCKET_URL}/api/auth/set-pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, pin }),
+      });
+      if (resp.ok) {
+        const updatedUser = { ...user, is_pin_enabled: true };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        toast({ title: "PIN Set", description: "Your security PIN has been updated." });
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  const handleLockNow = () => {
+    setIsLocked(true);
+    setPinVerified(false);
+  };
+
   const handleScan = () => {
     setIsRefreshing(true);
     socket?.emit("scan_wifi_network", { wifiName });
@@ -2382,6 +2551,10 @@ const Dashboard = () => {
               onUpdateSettings={handleUpdateSettings}
               onFriendAdded={refreshFriends}
               settings={settings}
+              isPinEnabled={user.is_pin_enabled || false}
+              onTogglePin={handleTogglePin}
+              onSetPin={handleSetPin}
+              onLockNow={handleLockNow}
               username={user.username}
               userId={user.id}
               cvId={user.cv_id || ""}
@@ -2455,9 +2628,20 @@ const Dashboard = () => {
                 wifiStatus={selectedFriend?._id ? (wifiConnectionStatus.get(selectedFriend._id) || 'offline') : 'offline'}
                 wifiTransferProgress={wifiTransferProgress}
                 onSendP2PFile={async (file) => {
-                    if (selectedFriend && webrtcManagerRef.current) {
-                        await webrtcManagerRef.current.sendFile(selectedFriend._id, file);
-                    }
+                  if (webrtcManagerRef.current && selectedFriend) {
+                    await webrtcManagerRef.current.sendFile(selectedFriend._id, file);
+                  }
+                }}
+                isDisappearing={selectedFriend ? (disappearingSettings.get(selectedFriend._id) ? true : false) : false}
+                onToggleDisappearing={(duration) => {
+                  if (selectedFriend) {
+                    setDisappearingSettings(prev => {
+                      const next = new Map(prev);
+                      if (duration === 0) next.delete(selectedFriend._id);
+                      else next.set(selectedFriend._id, duration);
+                      return next;
+                    });
+                  }
                 }}
               />
 
@@ -2514,7 +2698,6 @@ const Dashboard = () => {
             onConnectToUser={handleP2PRequest}
             outgoingP2PRequests={outgoingP2PRequests}
             friends={friends}
-            onAddFriend={handleAddFriend}
             onAddFriend={handleAddFriend}
           />
         )}
@@ -2618,6 +2801,16 @@ const Dashboard = () => {
         onForward={handleForwardMessage}
         onClose={() => setForwardingMsg(null)}
       />
+
+      <AnimatePresence>
+        {isLocked && user?.is_pin_enabled && (
+          <PinLockOverlay 
+            onVerify={handleVerifyPin} 
+            onLogout={handleLogout}
+            title={`${user.username}'s Vault`}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

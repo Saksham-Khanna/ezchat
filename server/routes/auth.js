@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 // Register
 router.post('/register', async (req, res) => {
@@ -605,6 +606,58 @@ router.put('/settings', async (req, res) => {
     res.json({ success: true, settings: user.settings });
   } catch (error) {
     res.status(500).json({ message: 'Error updating settings' });
+  }
+});
+
+// Set PIN
+router.post('/set-pin', async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Use bcrypt for PIN as well
+    const salt = await bcrypt.genSalt(10);
+    user.app_pin = await bcrypt.hash(pin, salt);
+    user.is_pin_enabled = true;
+    await user.save();
+    
+    res.json({ success: true, message: 'PIN set successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error setting PIN' });
+  }
+});
+
+// Verify PIN
+router.post('/verify-pin', async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (!user.app_pin) return res.status(400).json({ message: 'No PIN set' });
+
+    const isMatch = await bcrypt.compare(pin, user.app_pin);
+    if (!isMatch) return res.status(400).json({ message: 'Incorrect PIN' });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Error verifying PIN' });
+  }
+});
+
+// Toggle PIN
+router.post('/toggle-pin', async (req, res) => {
+  try {
+    const { userId, enabled } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.is_pin_enabled = enabled;
+    await user.save();
+    res.json({ success: true, enabled: user.is_pin_enabled });
+  } catch (error) {
+    res.status(500).json({ message: 'Error toggling PIN' });
   }
 });
 

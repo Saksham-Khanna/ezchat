@@ -12,6 +12,8 @@ export interface P2PMessage {
     emoji?: string;
     is_typing?: boolean;
     timestamp?: string;
+    is_disappearing?: boolean;
+    disappearing_duration?: number;
 }
 
 export class WebRTCManager {

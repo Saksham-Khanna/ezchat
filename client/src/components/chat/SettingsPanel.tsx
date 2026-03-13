@@ -23,6 +23,10 @@ interface SettingsPanelProps {
     notifications_enabled: boolean;
     sounds_enabled: boolean;
   };
+  isPinEnabled: boolean;
+  onTogglePin: (enabled: boolean) => void;
+  onSetPin: (pin: string) => Promise<boolean>;
+  onLockNow?: () => void;
   onClose: () => void;
 }
 
@@ -37,6 +41,10 @@ const SettingsPanel = ({
   onUpdateSettings,
   onFriendAdded,
   settings,
+  isPinEnabled,
+  onTogglePin,
+  onSetPin,
+  onLockNow,
   onClose,
 }: SettingsPanelProps) => {
   const [username, setUsername] = useState(initialUsername);
@@ -50,6 +58,8 @@ const SettingsPanel = ({
   const [passSaving, setPassSaving] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [loadingBlocked, setLoadingBlocked] = useState(false);
+  const [pinMode, setPinMode] = useState<"none" | "setting" | "changing">("none");
+  const [newPin, setNewPin] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -143,6 +153,17 @@ const SettingsPanel = ({
       }
     } catch (e) {
       console.error(e);
+    }
+    setPassSaving(false);
+  };
+
+  const handleSetPin = async () => {
+    if (newPin.length !== 4) return;
+    setPassSaving(true);
+    const success = await onSetPin(newPin);
+    if (success) {
+      setPinMode("none");
+      setNewPin("");
     }
     setPassSaving(false);
   };
@@ -443,11 +464,79 @@ const SettingsPanel = ({
                         className="w-full py-4 rounded-3xl gradient-primary text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20 flex items-center justify-center gap-2"
                       >
                         {passSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                        {passSaving ? "AUTHENTICATING..." : "COMMIT IDENTITY UPDATE"}
-                      </button>
-                   </div>
+                         {passSaving ? "AUTHENTICATING..." : "COMMIT IDENTITY UPDATE"}
+                       </button>
+                    </div>
 
-                   <div className="pt-10 border-t border-white/5">
+                    <div className="pt-10 border-t border-white/5 space-y-6">
+                       <div className="space-y-2">
+                          <h3 className="text-xl font-black tracking-tight uppercase italic">Vault <span className="text-primary not-italic">Security</span></h3>
+                          <p className="text-xs text-muted-foreground tracking-wide font-medium">Protect your holographic terminal with a 4-digit security PIN.</p>
+                       </div>
+
+                       <div className="group flex items-center justify-between p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all duration-300">
+                          <div className="flex items-center gap-6">
+                             <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                <ShieldCheck className="w-6 h-6" />
+                             </div>
+                             <div>
+                                <p className="text-sm font-black tracking-tight">App Lock Protocol</p>
+                                <p className="text-xs text-muted-foreground/60 max-w-xs">{isPinEnabled ? "Vault is currently protected by your PIN." : "Enable 4-digit PIN access for enhanced privacy."}</p>
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                             {isPinEnabled && (
+                               <button 
+                                 onClick={onLockNow}
+                                 className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[9px] font-black tracking-widest uppercase text-muted-foreground hover:text-foreground transition-all"
+                               >
+                                 Lock Now
+                               </button>
+                             )}
+                             <Toggle enabled={isPinEnabled} onClick={() => onTogglePin(!isPinEnabled)} />
+                          </div>
+                       </div>
+
+                       {isPinEnabled && (
+                         <div className="space-y-4">
+                            {pinMode === "none" ? (
+                              <button 
+                                onClick={() => setPinMode("setting")}
+                                className="text-xs font-bold text-primary hover:underline ml-2"
+                              >
+                                Change Security PIN
+                              </button>
+                            ) : (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="p-6 rounded-[2rem] bg-white/[0.03] border border-white/10 space-y-4"
+                              >
+                                 <label className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] ml-1">New 4-Digit PIN</label>
+                                 <div className="flex items-center gap-4">
+                                    <input 
+                                      type="password"
+                                      maxLength={4}
+                                      value={newPin}
+                                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                                      className="flex-1 px-6 py-4 rounded-2xl bg-white/[0.02] border border-white/5 text-center text-2xl tracking-[1em] font-black focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                      placeholder="••••"
+                                    />
+                                    <button 
+                                      onClick={handleSetPin}
+                                      disabled={newPin.length !== 4 || passSaving}
+                                      className="h-14 px-8 rounded-2xl gradient-primary text-[10px] font-black tracking-widest uppercase disabled:opacity-20"
+                                    >
+                                      {passSaving ? "Saving..." : "Save PIN"}
+                                    </button>
+                                 </div>
+                              </motion.div>
+                            )}
+                         </div>
+                       )}
+                    </div>
+
+                    <div className="pt-10 border-t border-white/5">
                       <div className="p-8 rounded-[2rem] bg-destructive/5 border border-destructive/10">
                          <h4 className="text-sm font-black tracking-tight text-destructive uppercase mb-2">Self-Destruct (Danger Zone)</h4>
                          <p className="text-xs text-muted-foreground mb-6">Wipe your entire holographic presence and history. This action is irreversible.</p>

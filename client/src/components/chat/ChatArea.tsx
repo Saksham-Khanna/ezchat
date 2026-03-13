@@ -1,17 +1,18 @@
 import { useState, useRef, useEffect, RefObject } from "react";
-import { 
-  Send, Smile, Paperclip, MoreVertical, Phone, Video, 
-  Search, Info, Image as ImageIcon, FileText, X, 
-  File, Download, Play, Check, CheckCheck, Trash2, 
+import {
+  Send, Smile, Paperclip, MoreVertical, Phone, Video,
+  Search, Info, Image as ImageIcon, FileText, X,
+  File, Download, Play, Check, CheckCheck, Trash2,
   Reply, Forward, SmilePlus, Edit2, CornerUpRight,
   Mic, Square, Loader2, Wifi, WifiOff, Globe, UserCircle,
-  Pencil, Lock as LockIcon
+  Pencil, Lock as LockIcon, SendHorizonal, Plus, RotateCcw, Clock
 } from "lucide-react";
 import type { Friend, Message } from "@/pages/Dashboard";
 import MessageBubble from "./MessageBubble";
 import VoicePlayer from "./VoicePlayer";
 import ImageEditor from "./ImageEditor";
 import ConfirmDialog from "./ConfirmDialog";
+import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 
 import { SOCKET_URL } from "@/lib/config";
@@ -49,6 +50,8 @@ interface ChatAreaProps {
   wifiStatus?: string;
   wifiTransferProgress?: Map<string, number>;
   onSendP2PFile?: (file: File) => Promise<void>;
+  isDisappearing?: boolean;
+  onToggleDisappearing?: (duration: number) => void;
   currentUserRole?: string;
   groupTypingUsers?: {username: string; avatar_url?: string}[];
 }
@@ -86,6 +89,8 @@ const ChatArea = ({
   wifiStatus = "offline",
   wifiTransferProgress = new Map(),
   onSendP2PFile,
+  isDisappearing = false,
+  onToggleDisappearing,
   currentUserRole,
   groupTypingUsers = [],
 }: ChatAreaProps) => {
@@ -147,72 +152,109 @@ const ChatArea = ({
 
   if (!selectedFriend) {
     return (
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-[#0A0B14]">
-        {/* Animated background orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[160px] animate-pulse opacity-40" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/10 rounded-full blur-[140px] animate-pulse opacity-30" style={{ animationDelay: '2s' }} />
+      <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-[#030712]">
+        {/* Immersive Background Effects */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-[50%] h-[50%] bg-primary/20 blur-[180px] rounded-full animate-pulse opacity-20" />
+          <div className="absolute bottom-1/4 right-1/4 w-[40%] h-[40%] bg-accent/10 blur-[160px] rounded-full animate-pulse opacity-15" style={{ animationDelay: '3s' }} />
+          
+          {/* Subtle grid pattern */}
+          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+        </div>
         
-        <div className="text-center animate-scale-in relative z-10 w-full max-w-lg px-6">
-          <div className="relative mb-10 flex justify-center">
-            {/* Gradient ring behind logo */}
+        <div className="text-center w-full max-w-2xl px-8 relative z-10 mt-[-4vh]">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="relative mb-8 pt-4"
+          >
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-44 h-44 rounded-full bg-gradient-to-br from-primary/30 to-accent/20 blur-3xl animate-pulse" />
+              <div className="w-64 h-64 rounded-full bg-primary/20 blur-[100px] animate-pulse" />
             </div>
-            <div className="relative w-80 h-48 flex items-center justify-center overflow-hidden">
-              <div 
-                className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/10 rounded-full blur-xl opacity-60" 
-                style={{
-                  maskImage: 'radial-gradient(circle, black 40%, transparent 80%)',
-                  WebkitMaskImage: 'radial-gradient(circle, black 40%, transparent 80%)'
-                }}
-              />
-              <img 
-                src="/full-logo.png" 
-                alt="ezchat" 
-                className="w-full h-full object-contain relative brand-logo logo-float scale-[2.2]"
-                style={{ 
-                  mixBlendMode: 'lighten',
-                  filter: 'contrast(1.1) brightness(1.1)',
-                  maskImage: 'radial-gradient(circle, black 50%, transparent 95%)',
-                  WebkitMaskImage: 'radial-gradient(circle, black 50%, transparent 95%)'
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-4xl font-black text-foreground tracking-tighter text-glow animate-slide-up">
-              Welcome to <span className="gradient-text">ezchat</span>
-            </h2>
             
-            <div className="h-12 flex items-center justify-center">
-              <p 
-                key={featureIndex}
-                className="text-primary/70 text-lg font-semibold tracking-wide animate-fade-in-up uppercase text-sm brightness-125 drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]"
-              >
-                {features[featureIndex]}
-              </p>
+            <div className="relative flex justify-center">
+              <div className="relative w-72 h-72 flex items-center justify-center">
+                <img 
+                  src="/full-logo.png" 
+                  alt="ezchat" 
+                  className="w-full h-full object-contain relative z-20 brand-logo drop-shadow-[0_0_35px_rgba(59,130,246,0.2)] transition-transform hover:scale-110 duration-700"
+                  style={{ mixBlendMode: 'screen' }}
+                />
+              </div>
             </div>
+          </motion.div>
 
-            <p className="text-muted-foreground/50 text-base max-w-[320px] mx-auto leading-relaxed font-medium">
-              Select a conversation from the sidebar to connect with your friends.
-            </p>
+          <div className="space-y-6">
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center justify-center gap-3">
+                <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-primary/50" />
+                <p className="text-[11px] font-black uppercase tracking-[0.5em] text-primary brightness-125 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                  The Mesh Protocol
+                </p>
+                <div className="h-[1px] w-8 bg-gradient-to-l from-transparent to-primary/50" />
+              </div>
+            </motion.div>
+            
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="h-16 flex items-center justify-center overflow-hidden"
+            >
+              <AnimatePresence mode="wait">
+                <motion.p 
+                  key={featureIndex}
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -20, opacity: 0 }}
+                  className="text-base font-bold text-white/70 tracking-wide"
+                >
+                  {features[featureIndex]}
+                </motion.p>
+              </AnimatePresence>
+            </motion.div>
+
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="grid grid-cols-2 gap-4 max-w-sm mx-auto"
+            >
+               {[
+                 { icon: Globe, label: "E2EE Verified", col: "text-green-400" },
+                 { icon: Wifi, label: "Mesh Ready", col: "text-blue-400" }
+               ].map((badge, bi) => (
+                 <div key={bi} className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/[0.03] border border-white/5 shadow-sm">
+                   <badge.icon className={`w-3.5 h-3.5 ${badge.col}`} />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-white/40">{badge.label}</span>
+                 </div>
+               ))}
+            </motion.div>
           </div>
           
-          {/* Synchronized dots */}
-          <div className="flex items-center justify-center gap-3 mt-10">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+            className="flex items-center justify-center gap-4 mt-6"
+          >
             {features.map((_, idx) => (
-              <span 
+              <button 
                 key={idx}
                 onMouseEnter={() => setFeatureIndex(idx)}
-                className={`transition-all duration-500 rounded-full cursor-pointer shadow-[0_0_10px_rgba(59,130,246,0.1)] ${
+                className={`transition-all duration-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.1)] ${
                   idx === featureIndex 
-                    ? "w-8 h-1.5 bg-primary shadow-lg shadow-primary/40 ring-1 ring-primary/20" 
-                    : "w-2 h-2 bg-white/10 hover:bg-white/30 hover:scale-125"
+                    ? "w-10 h-1.5 bg-primary shadow-lg shadow-primary/40 ring-1 ring-primary/20" 
+                    : "w-2.5 h-2.5 bg-white/5 hover:bg-white/20 hover:scale-125"
                 }`} 
               />
             ))}
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -599,6 +641,16 @@ const ChatArea = ({
                   >
                     <Trash2 className="w-4 h-4 text-orange-400" />
                     Clear Chat
+                  </button>
+                  <button
+                    onClick={() => { 
+                      onToggleDisappearing?.(isDisappearing ? 0 : 3600); // Default to 1 hour
+                      setShowMenu(false); 
+                    }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-foreground hover:bg-white/[0.05] transition-colors text-left"
+                  >
+                    <Clock className={`w-4 h-4 ${isDisappearing ? "text-primary animate-pulse" : "text-muted-foreground"}`} />
+                    {isDisappearing ? "Disappearing: ON" : "Disappearing Messages"}
                   </button>
                   <div className="h-[1px] bg-white/[0.05] my-1 mx-2" />
                   <button

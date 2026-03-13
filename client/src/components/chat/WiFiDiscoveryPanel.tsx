@@ -58,44 +58,70 @@ const WiFiDiscoveryPanel = ({
         className="relative w-full max-w-2xl h-full max-h-[90vh] bg-secondary/30 border border-white/10 rounded-[3rem] shadow-[0_32px_128px_rgba(0,0,0,0.6)] overflow-hidden glass-strong flex flex-col"
       >
         {/* Header */}
-        <div className="relative p-10 border-b border-white/[0.05] flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden">
+        <div className="relative p-6 md:p-10 border-b border-white/[0.05] flex flex-col items-stretch gap-6 overflow-hidden">
           {/* Animated Background Glow */}
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 blur-[120px] rounded-full animate-pulse-slow -z-10" />
           
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-[1.75rem] gradient-primary flex items-center justify-center shadow-[0_12px_32px_rgba(var(--primary),0.3)] group-hover:scale-105 transition-transform duration-500">
-                <Wifi className="w-8 h-8 text-primary-foreground stroke-[2.5]" />
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                {/* Radar Pulse Rings */}
+                {isScanning && (
+                  <>
+                    <motion.div 
+                      initial={{ scale: 0.8, opacity: 0.5 }}
+                      animate={{ scale: 2.2, opacity: 0 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                      className="absolute inset-0 rounded-[1.75rem] border-2 border-primary/30"
+                    />
+                    <motion.div 
+                      initial={{ scale: 0.8, opacity: 0.3 }}
+                      animate={{ scale: 1.8, opacity: 0 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: 0.5 }}
+                      className="absolute inset-0 rounded-[1.75rem] border-2 border-primary/20"
+                    />
+                  </>
+                )}
+                <div className="w-16 h-16 rounded-[1.75rem] gradient-primary flex items-center justify-center shadow-[0_12px_32px_rgba(var(--primary),0.3)] group-hover:scale-105 transition-transform duration-500 relative z-10">
+                  <Wifi className={`w-8 h-8 text-primary-foreground stroke-[2.5] ${isScanning ? "animate-pulse" : ""}`} />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-online border-[3px] border-background animate-pulse z-20" />
               </div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-online border-[3px] border-background animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-3xl font-black text-foreground tracking-tight drop-shadow-sm">Direct Mesh Discovery</h2>
-                <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black border border-primary/20 tracking-tighter uppercase mb-1">PRO</span>
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-3xl font-black text-white tracking-tight drop-shadow-sm">Direct Mesh</h2>
+                  <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black border border-primary/20 tracking-tighter uppercase mb-1">NODE</span>
+                </div>
+                <p className="text-sm font-medium text-muted-foreground/70 flex items-center gap-2 mt-1">
+                  <Network className="w-4 h-4 text-primary opacity-60" />
+                  Proximal discovery protocol active
+                </p>
               </div>
-              <p className="text-sm font-medium text-muted-foreground/70 flex items-center gap-2 mt-1">
-                <Network className="w-4 h-4 text-primary opacity-60" />
-                Connect with users on the same network instantly
-              </p>
             </div>
+
+            <button
+              onClick={onClose}
+              className="absolute top-6 right-6 md:static w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.05] flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/[0.08] transition-all active:scale-90"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
           
-          <div className="flex items-center gap-4 w-full md:w-auto">
-             <div className="relative flex-1 md:w-80 group">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+             <div className="relative flex-1 group w-full">
                 <Globe className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary transition-transform group-hover:scale-110" />
                 <input
                   type="text"
                   value={wifiName}
                   onChange={(e) => onSetWifiName(e.target.value)}
                   placeholder="Mesh Gateway ID (Leave empty for auto-detect)"
-                  className="w-full pl-12 pr-6 py-4 rounded-[1.5rem] bg-white/[0.03] border border-white/[0.06] text-foreground font-bold placeholder:text-muted-foreground/30 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all text-sm group-hover:bg-white/[0.05]"
+                  className="w-full pl-12 pr-6 py-4 rounded-[1.25rem] bg-white/[0.03] border border-white/[0.06] text-white font-bold placeholder:text-muted-foreground/30 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all text-sm group-hover:bg-white/[0.05]"
                 />
              </div>
              <button
                 onClick={handleScan}
                 disabled={isScanning}
-                className="px-8 py-4 rounded-[1.5rem] gradient-primary text-primary-foreground font-black text-xs shadow-[0_8px_32px_rgba(var(--primary),0.3)] hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3 min-w-[160px] justify-center glow-button"
+                className="w-full sm:w-auto px-8 py-4 rounded-[1.25rem] gradient-primary text-primary-foreground font-black text-xs shadow-[0_8px_32px_rgba(var(--primary),0.3)] hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3 min-w-[180px] justify-center glow-button shrink-0"
               >
                 {isScanning ? (
                   <>
@@ -105,21 +131,15 @@ const WiFiDiscoveryPanel = ({
                 ) : (
                   <>
                     <Search className="w-4 h-4 stroke-[3]" />
-                    <span className="tracking-widest uppercase">SCAN NEARBY</span>
+                    <span className="tracking-widest uppercase">DISCOVER NEARBY</span>
                   </>
                 )}
-              </button>
-              <button
-                onClick={onClose}
-                className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.05] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.08] transition-all active:scale-90"
-              >
-                <X className="w-6 h-6" />
               </button>
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 p-10 flex flex-col max-w-2xl mx-auto w-full overflow-y-auto scrollbar-thin">
+        <div className="flex-1 p-6 md:p-10 flex flex-col max-w-2xl mx-auto w-full overflow-y-auto scrollbar-thin">
            <NearbyUsersList 
              nearbyUsers={nearbyUsers.filter(u => u.userId !== userId)}
              friends={friends} 
@@ -132,18 +152,21 @@ const WiFiDiscoveryPanel = ({
         </div>
 
         {/* Footer / Status Bar */}
-        <div className="px-10 py-5 bg-white/[0.02] border-t border-white/[0.05] flex items-center justify-between text-[10px] font-black tracking-[0.2em] text-muted-foreground/40 uppercase">
-          <div className="flex items-center gap-6">
+        <div className="px-10 py-5 bg-[#030712]/40 border-t border-white/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4 text-[9px] font-bold font-mono tracking-widest text-muted-foreground/40 uppercase">
+          <div className="flex flex-wrap items-center justify-center gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              SYSTEM ACTIVE
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+              <span>CORE_MESH: ACTIVE</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
-              PROTOCOL: WEBRTC MESH
+            <div className="flex items-center gap-2 opacity-60">
+              <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
+              <span>MODE: P2P_WEBRTC</span>
             </div>
           </div>
-          <div>QUICKCHAT MESH NODE v2.1.0</div>
+          <div className="flex items-center gap-4">
+             <span className="opacity-40 select-none">|</span>
+             <span className="text-primary/40">NODE_VER: 2.1.0_STABLE</span>
+          </div>
         </div>
       </motion.div>
     </div>

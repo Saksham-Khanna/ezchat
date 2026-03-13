@@ -35,6 +35,10 @@ interface ChatSidebarProps {
   onToggleChatMode: (val: boolean) => void;
   chatMode: "internet" | "wifi";
   nearbyUsersCount: number;
+  isPinEnabled: boolean;
+  onTogglePin: (enabled: boolean) => void;
+  onSetPin: (pin: string) => Promise<boolean>;
+  onLockNow?: () => void;
   joinedRooms: any[];
   onSelectRoom: (room: any) => void;
   selectedRoom: any | null;
@@ -64,6 +68,10 @@ const ChatSidebar = ({
   onToggleChatMode,
   chatMode,
   nearbyUsersCount,
+  isPinEnabled,
+  onTogglePin,
+  onSetPin,
+  onLockNow,
   joinedRooms,
   onSelectRoom,
   selectedRoom,
@@ -197,9 +205,9 @@ const ChatSidebar = ({
                       <div className="absolute inset-0 bg-primary/15 blur-2xl rounded-full animate-pulse" />
                       <div className="absolute inset-0 bg-accent/10 blur-2xl rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
                       <img 
-                        src="/logo.png" 
+                        src="/full-logo.png" 
                         alt="" 
-                        className="w-full h-full object-contain relative opacity-30 hover:opacity-100 transition-opacity duration-700 brand-logo logo-float scale-[2.2]" 
+                        className="w-full h-full object-contain relative opacity-40 hover:opacity-100 transition-opacity duration-700 brand-logo logo-float" 
                         style={{ mixBlendMode: 'screen' }} 
                       />
                     </div>
@@ -251,18 +259,25 @@ const ChatSidebar = ({
                         <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{friend.username}</p>
+                              <p className="text-sm font-semibold text-foreground truncate">{friend.username}</p>
                               {friend.cv_id === "P2P" && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-primary/20 text-primary text-[8px] font-black uppercase tracking-widest border border-primary/20 leading-none shrink-0">P2P</span>
+                                <span className="px-1.5 py-0.5 rounded-md bg-primary/20 text-primary text-[7px] font-black uppercase tracking-widest border border-primary/20 leading-none shrink-0">P2P</span>
                               )}
                             </div>
-                            {Boolean(friend.unread_count && friend.unread_count > 0) && (
-                              <div className="flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full gradient-primary text-primary-foreground text-[10px] font-bold animate-pop-in shadow-lg shadow-primary/20">
-                                {friend.unread_count! > 9 ? '9+' : friend.unread_count}
-                              </div>
-                            )}
+                            <div className="flex flex-col items-end gap-1">
+                              {friend.last_message_time && (
+                                <span className="text-[9px] font-medium text-muted-foreground/50 whitespace-nowrap">{friend.last_message_time}</span>
+                              )}
+                              {Boolean(friend.unread_count && friend.unread_count > 0) && (
+                                <div className="flex items-center justify-center min-w-[1.2rem] h-4 px-1 rounded-full gradient-primary text-primary-foreground text-[8px] font-black animate-pop-in shadow-lg shadow-primary/20">
+                                  {friend.unread_count! > 9 ? '9+' : friend.unread_count}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground/70 truncate pr-6 mt-0.5">{friend.last_message}</p>
+                          <p className={`text-[11px] truncate pr-2 mt-0.5 ${Boolean(friend.unread_count && friend.unread_count > 0) ? "text-foreground font-bold" : "text-muted-foreground/60"}`}>
+                            {friend.last_message || "No messages yet"}
+                          </p>
                         </div>
                       </button>
                       
@@ -513,6 +528,10 @@ const ChatSidebar = ({
             onUpdateSettings={onUpdateSettings}
             onFriendAdded={onFriendAdded}
             settings={settings}
+            isPinEnabled={isPinEnabled}
+            onTogglePin={onTogglePin}
+            onSetPin={onSetPin}
+            onLockNow={onLockNow}
             onClose={() => setShowSettings(false)}
           />
         )}

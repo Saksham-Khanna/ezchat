@@ -42,6 +42,14 @@ const userSchema = new mongoose.Schema({
     notifications_enabled: { type: Boolean, default: true },
     sounds_enabled: { type: Boolean, default: true },
   },
+  app_pin: {
+    type: String,
+    default: null,
+  },
+  is_pin_enabled: {
+    type: Boolean,
+    default: false,
+  },
   cv_id: {
     type: String,
     unique: true,

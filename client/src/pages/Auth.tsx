@@ -84,15 +84,15 @@ const Auth = () => {
       <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-accent/[0.06] blur-[150px] rounded-full animate-pulse" style={{ animationDelay: '1.5s' }} />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/[0.03] rounded-full blur-[200px]" />
 
-      <div className="w-full max-w-md z-10">
+      <div className="w-full max-w-md z-10 mt-[-8vh]">
         {/* Logo Section */}
         <div className="text-center mb-8 animate-slide-up">
           <div className="relative inline-block mb-4">
-            <div className="relative flex items-center justify-center overflow-hidden h-32">
+            <div className="relative flex items-center justify-center overflow-hidden h-40">
               <img 
                 src="/full-logo.png" 
                 alt="ezchat Logo" 
-                className="h-full object-contain drop-shadow-2xl scale-[1.25]" 
+                className="h-full object-contain drop-shadow-2xl" 
                 style={{ mixBlendMode: 'screen' }}
               />
             </div>

@@ -105,9 +105,22 @@ router.get('/user/:userId', async (req, res) => {
 // Get group history
 router.get('/history/:room_id', async (req, res) => {
   try {
+    const { decrypt } = require('../utils/encryption');
     const messages = await Message.find({ recipient_id: req.params.room_id }).sort({ createdAt: 1 });
-    res.json(messages);
+    
+    const processedMessages = messages.map(msg => {
+      const msgObj = msg.toObject();
+      if (!msg.is_encrypted) {
+        try {
+          msgObj.content = decrypt(msg.content);
+        } catch(e) {}
+      }
+      return msgObj;
+    });
+
+    res.json(processedMessages);
   } catch (err) {
+    console.error('Group history error:', err);
     res.status(500).json({ message: 'Error fetching history' });
   }
 });

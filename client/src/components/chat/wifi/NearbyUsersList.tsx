@@ -1,4 +1,4 @@
-import { UserPlus, Search, Loader2 } from "lucide-react";
+import { UserPlus, Search, Loader2, Signal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SOCKET_URL } from "@/lib/config";
 
@@ -69,49 +69,59 @@ const NearbyUsersList = ({
                 <motion.div
                   key={u.userId}
                   layout
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: idx * 0.03 }}
-                  className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.04] hover:border-white/[0.08] transition-all hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] group"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="flex items-center justify-between p-4 rounded-3xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-primary/20 transition-all hover:shadow-[0_8px_32px_rgba(0,0,0,0.2)] group relative overflow-hidden active:scale-[0.99]"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="relative group-hover:scale-110 transition-transform duration-300">
-                      <div className="w-12 h-12 rounded-2xl bg-secondary ring-2 ring-white/[0.05] flex items-center justify-center text-white font-black text-sm overflow-hidden shadow-inner group-hover:ring-primary/40 transition-all duration-300">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className="relative">
+                      <div className="w-14 h-14 rounded-2xl bg-[#0F111A] ring-1 ring-white/10 flex items-center justify-center overflow-hidden shadow-2xl group-hover:ring-primary/40 transition-all duration-500">
                         {u.avatarUrl ? (
                           <img 
                             src={u.avatarUrl.startsWith("http") ? u.avatarUrl : `${SOCKET_URL}${u.avatarUrl}`} 
-                            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
-                              (e.target as HTMLImageElement).parentElement?.insertAdjacentHTML('beforeend', `<span class="flex items-center justify-center w-full h-full bg-primary/20 text-primary font-bold text-sm">${u.username.charAt(0).toUpperCase()}</span>`);
+                              (e.target as HTMLImageElement).parentElement?.insertAdjacentHTML('beforeend', `<span class="flex items-center justify-center w-full h-full bg-primary/20 text-primary font-bold text-lg">${u.username.charAt(0).toUpperCase()}</span>`);
                             }}
                           />
                         ) : (
-                          <span className="text-primary font-bold text-sm">{u.username.charAt(0).toUpperCase()}</span>
+                          <span className="text-primary font-black text-lg">{u.username.charAt(0).toUpperCase()}</span>
                         )}
                       </div>
-                      {/* Show online dot for all nearby users as they are online on the server */}
-                      <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background shadow-lg transition-colors duration-300 bg-online ${isConnected ? 'animate-pulse' : ''}`} />
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-[3px] border-[#0F111A] shadow-xl ${isConnected ? 'bg-online animate-pulse' : 'bg-online'}`} />
                     </div>
-                    <div>
+                    
+                    <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{u.username}</p>
-                        {isFriend && <span className="text-[9px] font-black bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 text-primary uppercase tracking-tighter">Friend</span>}
-                        {u.cv_id && <span className="text-[9px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-muted-foreground/40">{u.cv_id}</span>}
+                        <p className="text-sm font-black text-white tracking-tight group-hover:text-primary transition-colors">{u.username}</p>
+                        {isFriend && (
+                          <span className="text-[8px] font-black bg-primary/20 text-primary px-1.5 py-0.5 rounded-md border border-primary/20 uppercase tracking-widest">
+                            FAV
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <p className={`text-[10px] font-black uppercase tracking-wider ${isConnected ? 'text-online animate-pulse' : 'text-muted-foreground/60'}`}>
-                          {isConnected ? 'P2P Active' : status}
-                        </p>
+                      <div className="flex items-center gap-3">
+                         <div className="flex items-center gap-1.5 text-muted-foreground/40">
+                            <Signal className="w-3 h-3 text-primary/60" />
+                            <span className="text-[9px] font-black uppercase tracking-tighter">Signal: 98%</span>
+                         </div>
+                         <span className="text-[9px] opacity-20 text-white">|</span>
+                         <p className={`text-[9px] font-black uppercase tracking-widest ${isConnected ? 'text-primary animate-pulse' : 'text-muted-foreground/60'}`}>
+                           {isConnected ? 'NODE_ACTIVE' : 'READY_TO_MESH'}
+                         </p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="flex items-center gap-2 relative z-10">
                     {!isFriend && (
                       <button 
                         onClick={() => onAddFriend(u.cv_id || u.username)}
-                        title="Send Friend Request"
-                        className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/[0.05] hover:bg-primary/20 text-muted-foreground hover:text-primary flex items-center justify-center transition-all active:scale-90 hover:shadow-lg shadow-primary/10"
+                        className="w-10 h-10 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-primary/20 hover:border-primary/30 text-white/40 hover:text-primary flex items-center justify-center transition-all active:scale-90"
                       >
                         <UserPlus className="w-4 h-4" />
                       </button>
@@ -119,15 +129,15 @@ const NearbyUsersList = ({
                     <button 
                       onClick={() => onConnect(u.userId)}
                       disabled={outgoingP2PRequests.has(u.userId)}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all active:scale-95 shadow-lg ${
+                      className={`h-10 px-6 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95 shadow-xl ${
                         isConnected 
-                        ? "bg-online/10 text-online border border-online/20" 
+                        ? "bg-transparent text-primary border border-primary/30 backdrop-blur-md" 
                         : outgoingP2PRequests.has(u.userId)
-                        ? "bg-white/[0.1] text-muted-foreground border border-white/[0.05] opacity-50 cursor-not-allowed"
-                        : "gradient-primary text-primary-foreground shadow-primary/20 hover:opacity-90 active:scale-95 glow-button"
+                        ? "bg-white/[0.05] text-white/20 border border-white/5 cursor-not-allowed"
+                        : "gradient-primary text-primary-foreground shadow-primary/20 hover:brightness-110 glow-button"
                       }`}
                     >
-                      {isConnected ? "CONNECTED" : outgoingP2PRequests.has(u.userId) ? "REQUEST SENT" : "CONNECT"}
+                      {isConnected ? "ACTIVE" : outgoingP2PRequests.has(u.userId) ? "SENT" : "JOIN"}
                     </button>
                   </div>
                 </motion.div>

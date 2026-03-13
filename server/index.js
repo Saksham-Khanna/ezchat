@@ -12,6 +12,11 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve static files from the React app in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+}
+
 const User = require('./models/User');
 const Group = require('./models/Group');
 
@@ -578,6 +583,13 @@ function startServer(port) {
     // Successfully listening, remove the error listener from this attempt
     serverInstance.removeAllListeners('error');
     console.log(`🚀 Server is running on port ${port}`);
+  });
+}
+
+// Catch-all to serve React app in production
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
   });
 }
 

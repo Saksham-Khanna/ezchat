@@ -8,6 +8,8 @@
         "install-all": "npm run client-install && npm run server-install",
         "client": "npm run dev --prefix client",
         "server": "npm run start --prefix server",
+        "build": "npm run build --prefix client",
+        "start": "npm run start --prefix server",
         "dev": "concurrently \"npm run client\" \"npm run server\""
     },
     "devDependencies": {

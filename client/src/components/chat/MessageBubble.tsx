@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import type { Message } from "@/pages/Dashboard";
-import { Clock, Check, Download, Trash2, Reply, Pencil, Smile, Share2, Phone, Video } from "lucide-react";
+import { Clock, Check, Download, Trash2, Reply, Pencil, Smile, Share2, Phone, Video, Lock as LockIcon, Image as ImageIcon } from "lucide-react";
 import VoicePlayer from "./VoicePlayer";
 import { SOCKET_URL } from "@/lib/config";
 
@@ -52,6 +52,25 @@ const getDocName = (url: string) => {
 const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdit, onReact, onForward, onStartCall, currentUserId }: MessageBubbleProps) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (message.is_disappearing && message.expires_at) {
+      const expiry = new Date(message.expires_at).getTime();
+      const updateTimer = () => {
+        const now = Date.now();
+        const diff = Math.max(0, Math.floor((expiry - now) / 1000));
+        setTimeLeft(diff);
+        if (diff <= 0) {
+          onDeleteForMe(message._id);
+        }
+      };
+      
+      updateTimer();
+      const timer = setInterval(updateTimer, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [message.is_disappearing, message.expires_at, message._id, onDeleteForMe]);
 
   if (message.is_deleted) return null;
 
@@ -165,35 +184,62 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
               )}
             </div>
           )}
+          <div
+            className={`relative px-4 py-2.5 rounded-[1.4rem] shadow-sm transition-all duration-300 ${
+              isOwn
+                ? "bg-gradient-to-br from-primary to-primary-foreground/20 text-white rounded-tr-none shadow-primary/20 border border-white/10"
+                : "bg-white/[0.03] text-foreground rounded-tl-none border border-white/5"
+            } ${hasImage || hasCall || hasDoc ? "p-1.5" : ""}`}
+            style={{ 
+              boxShadow: isOwn ? '0 8px 24px -10px rgba(59, 130, 246, 0.4)' : '0 8px 24px -10px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+          {!isOwn && (
+            <div className="flex items-center gap-2 mb-1 px-1">
+              {message.sender_name && (
+                <div className="text-[10px] font-black uppercase tracking-wider text-primary brightness-125">
+                  {message.sender_name}
+                </div>
+              )}
+              {message.is_encrypted && (
+                <LockIcon className="w-2.5 h-2.5 text-primary/40" />
+              )}
+            </div>
+          )}
           {/* Reply Preview */}
           {message.reply_to && (
-            <div className={`mb-2 p-2 rounded-lg border-l-[3px] text-[11px] min-w-[120px] ${isOwn ? "bg-white/10 border-white/30" : "bg-white/[0.04] border-primary/50"}`}>
-               <p className="font-bold mb-0.5 opacity-60 text-[10px]">
-                 {message.reply_to.sender_id === currentUserId ? "You" : "Them"}
+            <div className={`mb-2 p-2 rounded-xl border-l-[3px] text-[11px] min-w-[140px] backdrop-blur-md ${isOwn ? "bg-white/10 border-white/40" : "bg-white/[0.04] border-primary/50"}`}>
+               <p className="font-black mb-0.5 opacity-60 text-[9px] uppercase tracking-widest">
+                 {message.reply_to.sender_id === currentUserId ? "You" : (message.sender_name || "Them")}
                </p>
-               <p className="opacity-70 truncate">{message.reply_to.content}</p>
+               <p className="opacity-70 truncate font-medium">{message.reply_to.content}</p>
             </div>
           )}
           {message.is_forwarded && (
-            <div className="flex items-center gap-1 mb-1 text-[10px] italic opacity-50">
+            <div className="flex items-center gap-1.5 mb-1.5 text-[9px] font-black uppercase tracking-widest opacity-40 px-1">
               <Share2 className="w-2.5 h-2.5" />
               <span>Forwarded</span>
             </div>
           )}
           {hasImage && (
-            <a href={getMediaSrc()} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden">
+            <a href={getMediaSrc()} target="_blank" rel="noopener noreferrer" className="relative block rounded-2xl overflow-hidden group/img">
               <img
                 src={getMediaSrc()}
-                alt="Shared image"
-                className="rounded-xl max-w-full max-h-64 object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-500"
+                alt="Shared content"
+                className="rounded-xl max-w-full max-h-72 object-cover cursor-pointer hover:scale-[1.03] transition-transform duration-700"
               />
+              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                 <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                   <ImageIcon className="w-5 h-5 text-white" />
+                 </div>
+              </div>
             </a>
           )}
           {message.media_type === 'video' && message.media_url && (
             <video 
               src={getMediaSrc()} 
               controls 
-              className="rounded-xl max-w-full max-h-64 outline-none"
+              className="rounded-xl max-w-full max-h-72 shadow-lg outline-none"
             />
           )}
           {hasAudio && (
@@ -204,70 +250,85 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
               href={getMediaSrc()}
               target="_blank"
               rel="noopener noreferrer"
-              className={`flex items-center gap-3 min-w-[200px] p-2.5 rounded-xl transition-all duration-300 ${
-                isOwn ? "bg-white/10 hover:bg-white/15" : "bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05]"
+              className={`flex items-center gap-4 min-w-[220px] p-3 rounded-2xl transition-all duration-300 ${
+                isOwn ? "bg-white/10 hover:bg-white/15" : "bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 shadow-sm"
               }`}
             >
-              <span className="text-2xl shrink-0">{getDocIcon(message.media_url!)}</span>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${isOwn ? "bg-white/10" : "bg-primary/10"}`}>
+                {getDocIcon(message.media_url!)}
+              </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-xs font-medium truncate ${isOwn ? "text-white" : "text-foreground"}`}>
+                <p className={`text-[13px] font-bold truncate ${isOwn ? "text-white" : "text-foreground"}`}>
                   {getDocName(message.media_url!)}
                 </p>
-                <p className={`text-[10px] mt-0.5 ${isOwn ? "text-white/40" : "text-muted-foreground/50"}`}>
-                  Document
+                <p className={`text-[10px] mt-0.5 font-medium uppercase tracking-widest ${isOwn ? "text-white/40" : "text-muted-foreground/50"}`}>
+                   Document node
                 </p>
               </div>
-              <Download className={`w-4 h-4 shrink-0 ${isOwn ? "text-white/40" : "text-muted-foreground/50"}`} />
+              <Download className={`w-4 h-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity ${isOwn ? "text-white" : "text-foreground"}`} />
             </a>
           )}
           {hasCall && (
             <button 
               onClick={() => onStartCall?.(message.media_type === 'call_video' ? 'video' : 'audio')}
-              className={`flex items-center gap-3 min-w-[180px] p-1 rounded-xl group/call transition-all hover:bg-black/5 active:scale-95 text-left`}
+              className={`flex items-center gap-4 min-w-[200px] p-2 rounded-2xl group/call transition-all hover:bg-black/5 active:scale-[0.98] text-left`}
               title={`Call back (${message.media_type === 'call_video' ? 'Video' : 'Voice'})`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover/call:scale-110 ${
-                isOwn ? "bg-white/20" : "bg-primary/10"
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all group-hover/call:scale-105 shadow-md ${
+                isOwn ? "bg-white/20" : "bg-primary/20"
               }`}>
                 {message.media_type === 'call_video' ? (
-                  <Video className={`w-5 h-5 ${isOwn ? "text-white" : "text-primary"}`} />
+                  <Video className={`w-6 h-6 ${isOwn ? "text-white" : "text-primary brightness-125"}`} />
                 ) : (
-                  <Phone className={`w-5 h-5 ${isOwn ? "text-white" : "text-primary"}`} />
+                  <Phone className={`w-6 h-6 ${isOwn ? "text-white" : "text-primary brightness-125"}`} />
                 )}
               </div>
-              <div className="flex-1">
-                <p className={`text-xs font-bold ${isOwn ? "text-white" : "text-foreground"}`}>
-                  {message.media_type === 'call_video' ? 'Video Call' : 'Voice Call'}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-black tracking-tight ${isOwn ? "text-white" : "text-foreground"}`}>
+                  {message.media_type === 'call_video' ? 'VIDEO CALL' : 'VOICE CALL'}
                 </p>
-                <p className={`text-[10px] mt-0.5 ${isOwn ? "text-white/60" : "text-muted-foreground/50"}`}>
+                <p className={`text-[10px] mt-1 font-medium font-mono truncate uppercase tracking-tighter ${isOwn ? "text-white/70" : "text-muted-foreground/60"}`}>
                   {message.call_duration && message.call_duration > 0 
-                    ? `Duration: ${formatDuration(message.call_duration)}` 
+                    ? `TRANS: ${formatDuration(message.call_duration)}` 
                     : message.content}
                 </p>
               </div>
             </button>
           )}
           {!isImageOnly && !isAudioOnly && !isDocOnly && !isCallOnly && (
-            <p className={`break-words whitespace-pre-wrap break-all ${hasImage ? "px-2.5 py-1.5" : hasAudio || hasDoc ? "mt-1" : ""}`}>{message.content}</p>
+            <p className={`text-sm leading-relaxed font-medium break-words whitespace-pre-wrap ${hasImage ? "px-3 py-2" : hasAudio || hasDoc ? "mt-2 px-1" : ""}`}>
+              {message.content}
+            </p>
           )}
           {/* Reactions inside or attached to the bubble */}
           {message.reactions && message.reactions.length > 0 && (
-            <div className="absolute -bottom-3 right-2 flex -space-x-1">
+            <div className={`absolute -bottom-3 ${isOwn ? "right-2" : "left-2"} flex -space-x-1.5`}>
               {Array.from(new Set(message.reactions.map(r => r.emoji))).slice(0, 3).map((emoji, i) => (
-                <div key={i} className="w-5 h-5 rounded-full bg-secondary/90 backdrop-blur-sm border border-white/[0.08] flex items-center justify-center text-[10px] shadow-sm transform hover:scale-125 transition-transform cursor-default animate-pop-in" title={`${message.reactions?.length} reactions`}>
+                <div key={i} className="w-6 h-6 rounded-full bg-white/[0.08] backdrop-blur-xl border border-white/[0.1] flex items-center justify-center text-xs shadow-xl transform hover:scale-125 transition-transform cursor-default animate-pop-in z-20" title={`${message.reactions?.length} reactions`}>
                   {emoji}
                 </div>
               ))}
+              {message.reactions.length > 3 && (
+                 <div className="w-6 h-6 rounded-full bg-white/[0.08] backdrop-blur-xl border border-white/[0.1] flex items-center justify-center text-[8px] font-black text-white/50 shadow-sm z-10">
+                   +{message.reactions.length - 3}
+                 </div>
+              )}
             </div>
           )}
           </div>
-        
+     </div>
           {/* Timestamp BELOW the bubble completely */}
           <div className={`flex flex-row items-center gap-1 mt-1 text-[10px] opacity-60 px-1 ${isOwn ? "justify-end text-right" : "justify-start text-left"}`}>
-             {message.is_edited && <span className="italic mr-1">edited</span>}
-             {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-             {isOwn && <StatusIcon status={message.status} />}
-          </div>
+              {message.is_edited && <span className="italic mr-1">edited</span>}
+              {timeLeft !== null && (
+                <span className="flex items-center gap-1 text-orange-400 font-bold bg-orange-500/10 px-1.5 py-0.5 rounded-md animate-pulse">
+                  <Clock className="w-2.5 h-2.5" />
+                  {timeLeft > 60 ? `${Math.ceil(timeLeft / 60)}m` : `${timeLeft}s`}
+                </span>
+              )}
+              {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {isOwn && <StatusIcon status={message.status} />}
+           </div>
         </div>
       </div>
 

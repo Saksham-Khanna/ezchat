@@ -153,10 +153,17 @@ router.post('/upload-video', videoUpload.single('video'), async (req, res) => {
 // Send Message
 router.post('/send', async (req, res) => {
   try {
-    const { sender_id, recipient_id, content, media_url, media_type, reply_to, call_duration, sender_name } = req.body;
+    const { 
+      sender_id, recipient_id, content, media_url, media_type, 
+      reply_to, call_duration, sender_name, is_e2ee,
+      is_disappearing, disappearing_duration
+    } = req.body;
     
-    // Encrypt content before saving
-    const encryptedContent = encrypt(content || "");
+    // Only encrypt on server if NOT E2EE (e.g. legacy or group fallback)
+    let finalContent = content;
+    if (!is_e2ee) {
+      finalContent = encrypt(content || "");
+    }
 
     // Skip recipient check for rooms
     if (!recipient_id.startsWith('room_')) {
@@ -164,15 +171,21 @@ router.post('/send', async (req, res) => {
       if (!recipient) return res.status(404).json({ message: 'Recipient not found' });
     }
 
+    const expires_at = is_disappearing ? new Date(Date.now() + (disappearing_duration * 1000)) : null;
+
     const newMessage = new Message({
       sender_id,
       recipient_id,
       sender_name,
-      content: encryptedContent,
+      content: finalContent,
+      is_encrypted: !!is_e2ee, // flag to indicate client-side encryption
       media_url: media_url || '',
       media_type,
       reply_to: reply_to || null,
       call_duration: call_duration || 0,
+      is_disappearing,
+      disappearing_duration: disappearing_duration || 0,
+      expires_at
     });
 
     await newMessage.save();
@@ -223,28 +236,21 @@ router.get('/history/:user1/:user2', async (req, res) => {
     })
     .sort({ createdAt: 1 });
 
-    // Decrypt messages before sending to client, filter out deleted_for and is_deleted
-    const decryptedMessages = messages
+    // Passthrough messages, client will decrypt
+    const processedMessages = messages
       .filter(msg => !msg.is_deleted && !msg.deleted_for.some(id => id.toString() === user1))
       .map(msg => {
         const msgObj = msg.toObject();
-        try {
-          msgObj.content = decrypt(msg.content);
-        } catch (e) {
-          console.error("Decryption failed for message", msg._id);
+        // If it was server-encrypted and NOT E2EE, decrypt it here for legacy support
+        if (!msg.is_encrypted) {
+           try {
+             msgObj.content = decrypt(msg.content);
+           } catch(e) {}
         }
-
-        // Decrypt reply if present
-        if (msgObj.reply_to && msgObj.reply_to.content) {
-          try {
-            msgObj.reply_to.content = decrypt(msgObj.reply_to.content);
-          } catch(e) {}
-        }
-
         return msgObj;
       });
 
-    res.json(decryptedMessages);
+    res.json(processedMessages);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error fetching chat history' });
@@ -337,17 +343,29 @@ router.post('/delete-for-me/:id', async (req, res) => {
 // Edit Message
 router.put('/:id', async (req, res) => {
   try {
-    const { content, sender_id } = req.body;
+    const { content, sender_id, is_e2ee } = req.body;
     const message = await Message.findById(req.params.id);
     if (!message) return res.status(404).json({ message: 'Message not found' });
     if (message.sender_id.toString() !== sender_id) return res.status(403).json({ message: 'Unauthorized' });
 
-    message.content = encrypt(content);
+    // Handle encryption state for the edit
+    if (is_e2ee !== undefined) {
+      message.is_encrypted = !!is_e2ee;
+    }
+
+    // Only server-side encrypt if NOT E2EE
+    if (!message.is_encrypted) {
+      message.content = encrypt(content || "");
+    } else {
+      message.content = content;
+    }
+
     message.is_edited = true;
     await message.save();
 
     res.json({ success: true, content });
   } catch (error) {
+    console.error('Edit message error:', error);
     res.status(500).json({ message: 'Error editing message' });
   }
 });
