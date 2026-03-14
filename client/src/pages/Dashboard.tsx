@@ -135,6 +135,7 @@ const Dashboard = () => {
   const callRecipientIdRef = useRef<string | null>(null);
   const callStartTimeRef = useRef<number | null>(null);
   const isCallerRef = useRef<boolean>(false);
+  const pendingIceCandidates = useRef<RTCIceCandidateInit[]>([]);
   const [settings, setSettings] = useState({
     theme: 'dark',
     show_read_receipts: true,
@@ -774,6 +775,7 @@ const Dashboard = () => {
             await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
             setCallStatus("connected");
             callStartTimeRef.current = Date.now();
+            processIceQueue();
           } catch (err) {
             console.error("Error setting remote description on answer", err);
           }
@@ -781,12 +783,15 @@ const Dashboard = () => {
       });
 
       newSocket.on("ice-candidate", async (data: { candidate: any }) => {
-        if (peerConnectionRef.current) {
+        if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
           try {
             await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
           } catch (e) {
             console.error("Error adding ice candidate", e);
           }
+        } else {
+          console.log("Queueing ICE candidate (PC not ready or no remote description)");
+          pendingIceCandidates.current.push(data.candidate);
         }
       });
 
@@ -805,9 +810,10 @@ const Dashboard = () => {
         if (peerConnectionRef.current) {
           try {
             await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+            processIceQueue();
             const answer = await peerConnectionRef.current.createAnswer();
             await peerConnectionRef.current.setLocalDescription(answer);
-            newSocket.emit("call-negotiation-answer", { to: data.from, answer });
+            newSocket.emit("call-negotiation-answer", { to: data.from.toString(), answer });
           } catch (err) {
             console.error("Negotiation failed", err);
           }
@@ -819,6 +825,7 @@ const Dashboard = () => {
         if (peerConnectionRef.current) {
           try {
             await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+            processIceQueue();
           } catch (err) {
             console.error("Negotiation answer failed", err);
           }
@@ -1956,6 +1963,7 @@ const Dashboard = () => {
     setActiveCallFriend(null);
     callRecipientIdRef.current = null;
     (window as any).incomingCallOffer = null;
+    pendingIceCandidates.current = [];
 
     // Background: Save call log 
     if (currentActiveFriend && user) {
@@ -2019,7 +2027,7 @@ const Dashboard = () => {
           const offer = await peerConnectionRef.current.createOffer();
           await peerConnectionRef.current.setLocalDescription(offer);
           socket.emit("call-negotiation", {
-            to: activeCallFriend._id,
+            to: activeCallFriend._id.toString(),
             from: user.id,
             offer
           });
@@ -2042,21 +2050,42 @@ const Dashboard = () => {
 
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
-        socket.emit("ice-candidate", { candidate: event.candidate, to: recipientId });
+        socket.emit("ice-candidate", { candidate: event.candidate, to: recipientId.toString() });
       }
     };
 
     pc.ontrack = (event) => {
-      console.log("Received remote track:", event.track.kind, event.streams[0]?.id);
-      if (event.streams && event.streams[0]) {
-        // ALWAYS create a NEW MediaStream reference to force re-renders in hooks
-        const newStream = new MediaStream(event.streams[0]);
-        setRemoteStream(newStream);
-      }
+      console.log("Received remote track:", event.track.kind, event.track.id);
+      setRemoteStream(prev => {
+        const stream = prev || new MediaStream();
+        // Check if track already exists to avoid duplicates
+        if (!stream.getTracks().find(t => t.id === event.track.id)) {
+          stream.addTrack(event.track);
+          console.log(`Added ${event.track.kind} track to remote stream`);
+        }
+        // Always return a NEW MediaStream wrapper to ensure React reactivity
+        return new MediaStream(stream.getTracks());
+      });
     };
 
     peerConnectionRef.current = pc;
     return pc;
+  };
+
+  const processIceQueue = async () => {
+    if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) return;
+    
+    console.log(`Processing ${pendingIceCandidates.current.length} queued ICE candidates`);
+    while (pendingIceCandidates.current.length > 0) {
+      const candidate = pendingIceCandidates.current.shift();
+      try {
+        if (candidate) {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      } catch (e) {
+        console.error("Error adding queued ice candidate", e);
+      }
+    }
   };
 
   const handleStartCall = async (type: "audio" | "video" = "audio") => {
@@ -2070,27 +2099,32 @@ const Dashboard = () => {
     isCallerRef.current = true;
 
     try {
-      const constraints = { audio: true, video: type === "video" };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
+      } catch (e) {
+        console.warn("Failed to get media with requested type, falling back to audio only", e);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      }
       setLocalStream(stream);
       
-      const pc = createPeerConnection(selectedFriend._id);
+      const pc = createPeerConnection(selectedFriend._id.toString());
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
       socket.emit("call-user", {
-        to: selectedFriend._id,
+        to: selectedFriend._id.toString(),
         from: user.id,
         offer,
-        type,
+        type: stream.getVideoTracks().length > 0 ? "video" : "audio",
         callerName: user.username,
         callerAvatar: user.avatar_url ? (user.avatar_url.startsWith("http") ? user.avatar_url : `${SOCKET_URL}${user.avatar_url}`) : ""
       });
     } catch (err) {
-      console.error("Call start failed", err);
-      toast({ title: `${type === 'video' ? 'Camera/Mic' : 'Microphone'} Access Denied`, variant: "destructive" });
+      console.error("Call start failed completely", err);
+      toast({ title: "Microphone Access Denied", variant: "destructive" });
       resetCall();
     }
   };
@@ -2099,40 +2133,46 @@ const Dashboard = () => {
     if (!activeCallFriend || !user || !socket || !(window as any).incomingCallOffer) return;
 
     try {
-      const constraints = { audio: true, video: callType === "video" };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: callType === "video" });
+      } catch (e) {
+        console.warn("Fallback to audio-only on accept", e);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      }
       setLocalStream(stream);
       
-      const pc = createPeerConnection(activeCallFriend._id);
+      const pc = createPeerConnection(activeCallFriend._id.toString());
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       await pc.setRemoteDescription(new RTCSessionDescription((window as any).incomingCallOffer));
+      processIceQueue();
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
       socket.emit("make-answer", {
-        to: activeCallFriend._id,
+        to: activeCallFriend._id.toString(),
         answer
       });
 
       setCallStatus("connected");
       callStartTimeRef.current = Date.now();
     } catch (err) {
-      console.error("Accept call failed", err);
+      console.error("Accept call failed completely", err);
       resetCall();
     }
   };
 
   const handleRejectCall = () => {
     if (activeCallFriend && socket) {
-      socket.emit("reject-call", { to: activeCallFriend._id });
+      socket.emit("reject-call", { to: activeCallFriend._id.toString() });
     }
     resetCall();
   };
 
   const handleEndCall = () => {
     if (activeCallFriend && socket) {
-      socket.emit("end-call", { to: activeCallFriend._id });
+      socket.emit("end-call", { to: activeCallFriend._id.toString() });
     }
     resetCall();
   };
@@ -2470,8 +2510,8 @@ const Dashboard = () => {
     setOutgoingP2PRequests(prev => new Set(prev).add(targetId));
 
     socket.emit("p2p_connect_request", {
-      to: targetId,
-      from: user.id,
+      to: targetId.toString(),
+      from: user.id.toString(),
       fromUsername: user.username,
       fromAvatar: user.avatar_url,
       from_cv_id: user.cv_id
@@ -2483,8 +2523,8 @@ const Dashboard = () => {
     if (!socket || !user || !incomingP2PRequest) return;
     
     socket.emit("p2p_connect_accepted", {
-      to: incomingP2PRequest.from,
-      from: user.id,
+      to: incomingP2PRequest.from.toString(),
+      from: user.id.toString(),
       fromUsername: user.username,
       fromAvatar: user.avatar_url,
       networkId: user.cv_id
@@ -2522,8 +2562,8 @@ const Dashboard = () => {
   const handleP2PReject = () => {
      if (!socket || !user || !incomingP2PRequest) return;
      socket.emit("p2p_connect_rejected", {
-       to: incomingP2PRequest.from,
-       from: user.id,
+       to: incomingP2PRequest.from.toString(),
+       from: user.id.toString(),
        fromUsername: user.username
      });
      setIncomingP2PRequest(null);

@@ -520,48 +520,56 @@ io.on('connection', (socket) => {
 
   // --- Voice Call Signaling ---
   socket.on('call-user', (data) => {
-    // data: { offer, to, from, callerName, callerAvatar }
-    console.log(`Call offer from ${data.from} to ${data.to}`);
-    io.to(data.to).emit('incoming-call', {
-      offer: data.offer,
-      from: data.from,
-      callerName: data.callerName,
-      callerAvatar: data.callerAvatar,
-      type: data.type
-    });
+    const to = data.to?.toString();
+    console.log(`Call offer from ${data.from} to ${to} (type: ${data.type})`);
+    if (to) {
+      io.to(to).emit('incoming-call', {
+        offer: data.offer,
+        from: data.from?.toString(),
+        callerName: data.callerName,
+        callerAvatar: data.callerAvatar,
+        type: data.type
+      });
+    }
   });
 
   socket.on('make-answer', (data) => {
-    // data: { answer, to }
-    console.log(`Call answer to ${data.to}`);
-    io.to(data.to).emit('call-answered', {
-      answer: data.answer
-    });
+    const to = data.to?.toString();
+    console.log(`Call answer from ${socket.id} to ${to}`);
+    if (to) {
+      io.to(to).emit('call-answered', {
+        answer: data.answer
+      });
+    }
   });
 
   socket.on('ice-candidate', (data) => {
-    // data: { candidate, to }
-    io.to(data.to).emit('ice-candidate', {
-      candidate: data.candidate
-    });
+    const to = data.to?.toString();
+    if (to) {
+      io.to(to).emit('ice-candidate', {
+        candidate: data.candidate
+      });
+    }
   });
 
   socket.on('reject-call', (data) => {
-    // data: { to }
-    io.to(data.to).emit('call-rejected');
+    const to = data.to?.toString();
+    if (to) io.to(to).emit('call-rejected');
   });
 
   socket.on('end-call', (data) => {
-    // data: { to }
-    io.to(data.to).emit('call-ended');
+    const to = data.to?.toString();
+    if (to) io.to(to).emit('call-ended');
   });
 
   socket.on('call-negotiation', (data) => {
-    io.to(data.to).emit('call-negotiation', { offer: data.offer, from: data.from });
+    const to = data.to?.toString();
+    if (to) io.to(to).emit('call-negotiation', { offer: data.offer, from: data.from });
   });
 
   socket.on('call-negotiation-answer', (data) => {
-    io.to(data.to).emit('call-negotiation-answer', { answer: data.answer });
+    const to = data.to?.toString();
+    if (to) io.to(to).emit('call-negotiation-answer', { answer: data.answer });
   });
 });
 

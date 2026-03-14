@@ -33,6 +33,7 @@ const CallOverlay = ({
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const remoteMediaRef = useRef<HTMLVideoElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     if (status === "incoming") {
@@ -55,6 +56,9 @@ const CallOverlay = ({
     };
   }, [status]);
 
+  const isRemoteVideoActive = remoteStream && remoteStream.getVideoTracks().some(t => t.enabled && t.readyState !== 'ended');
+  const isRemoteAudioActive = remoteStream && remoteStream.getAudioTracks().some(t => t.enabled && t.readyState !== 'ended');
+
   // Robustly attach streams
   useEffect(() => {
     const remoteVideo = remoteMediaRef.current;
@@ -70,28 +74,27 @@ const CallOverlay = ({
         const playVideo = async () => {
           try {
             await remoteVideo.play();
-            console.log("Remote video playing successfully");
+            console.log("Remote media playing successfully");
           } catch (e) {
-            console.warn("Remote play failed, trying muted fallback...", e);
-            // If autoplay is blocked, sometimes we HAVE to start muted then unmute on click
-            // But usually User Acceptance of call counts as a gesture.
+            console.warn("Remote play failed", e);
           }
         };
 
         remoteVideo.onloadedmetadata = playVideo;
-        // Periodic check to ensure it's still playing if it's supposed to be
+        
+        // Periodic check to ensure it's still playing (handles autoplay blocks)
         const playInterval = setInterval(() => {
-          if (remoteVideo.paused && isRemoteVideoActive) {
+          if (remoteVideo.paused && (isRemoteVideoActive || isRemoteAudioActive)) {
             playVideo();
           }
-        }, 2000);
+        }, 2500);
 
         return () => {
           clearInterval(playInterval);
           remoteVideo.onloadedmetadata = null;
         }
     }
-  }, [status, remoteStream, isRemoteVideoActive]);
+  }, [status, remoteStream, isRemoteVideoActive, isRemoteAudioActive]);
 
   // Listener for track enablement changes (WebRTC specific)
   useEffect(() => {
@@ -100,7 +103,7 @@ const CallOverlay = ({
     // We want to re-evaluate isRemoteVideoActive if tracks change
     const handleTrackEvent = () => {
       console.log("Track event detected (mute/unmute/ended)");
-      setDuration(d => d); 
+      setRefresh(prev => prev + 1); 
     };
 
     const tracks = remoteStream.getTracks();
@@ -153,8 +156,6 @@ const CallOverlay = ({
     const secs = (s % 60).toString().padStart(2, "0");
     return `${mins}:${secs}`;
   };
-
-  const isRemoteVideoActive = remoteStream && remoteStream.getVideoTracks().some(t => t.enabled && t.readyState !== 'ended');
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#020617] overflow-hidden">
