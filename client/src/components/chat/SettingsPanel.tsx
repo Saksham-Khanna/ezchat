@@ -309,7 +309,7 @@ const SettingsPanel = ({
                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Online Profile</span>
                              </div>
                              <div className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-                               <span className="text-[10px] font-mono font-bold text-primary">{cvId}</span>
+                               <span className="text-[10px] font-mono font-bold text-primary hover:text-[12px] transition-all duration-300 cursor-default">{cvId}</span>
                              </div>
                           </div>
                        </div>

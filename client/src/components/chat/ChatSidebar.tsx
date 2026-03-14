@@ -502,7 +502,7 @@ const ChatSidebar = ({
                 </div>
                 <div className="flex-1 min-w-0 leading-tight">
                   <p className="text-xs font-semibold text-foreground truncate">{username}</p>
-                  <p className="text-[9px] text-muted-foreground font-mono bg-secondary/40 px-1.5 py-0.5 rounded border border-white/[0.1] mt-0.5 inline-block truncate max-w-full">
+                  <p className="text-[9px] text-muted-foreground font-mono bg-secondary/40 px-1.5 py-0.5 rounded border border-white/[0.1] mt-0.5 inline-block truncate max-w-full hover:text-[11px] transition-all duration-300 cursor-default">
                     {cvId}
                   </p>
                 </div>

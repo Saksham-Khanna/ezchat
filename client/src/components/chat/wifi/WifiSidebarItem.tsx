@@ -76,14 +76,14 @@ const WifiSidebarItem = ({
       </button>
 
       {/* Mode Indicators */}
-      <div className="flex items-center gap-4 px-1">
+      <div className="flex items-center justify-evenly w-full">
         <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase transition-opacity duration-300 ${!isActive ? "opacity-100 text-accent/80" : "opacity-30"}`}>
-          <Zap className="w-2.5 h-2.5" />
+          <Zap className="w-3 h-3" />
           Global Mode
         </div>
         <div className="w-1 h-1 rounded-full bg-white/10" />
         <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase transition-opacity duration-300 ${isActive ? "opacity-100 text-primary" : "opacity-30"}`}>
-          <Wifi className="w-2.5 h-2.5" />
+          <Wifi className="w-3 h-3" />
           Mesh Mode
         </div>
       </div>
