@@ -110,9 +110,12 @@ router.get('/history/:room_id', async (req, res) => {
     
     const processedMessages = messages.map(msg => {
       const msgObj = msg.toObject();
-      if (!msg.is_encrypted) {
+      if (msg.content && msg.content.startsWith('U2FsdGVkX1')) {
         try {
-          msgObj.content = decrypt(msg.content);
+          const decrypted = decrypt(msg.content);
+          if (decrypted && decrypted !== msg.content) {
+            msgObj.content = decrypted;
+          }
         } catch(e) {}
       }
       return msgObj;

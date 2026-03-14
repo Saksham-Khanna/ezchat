@@ -737,8 +737,8 @@ const ChatArea = ({
         )}
         {/* Messages Container */}
         <div className="flex-1 overflow-hidden relative">
-          <div className="h-full flex flex-col max-w-4xl mx-auto w-full pl-9 pr-9">
-            <div className="flex-1 overflow-y-auto scrollbar-thin py-6 flex flex-col scroll-smooth">
+          <div className="h-full flex flex-col max-w-4xl mx-auto w-full px-4 md:px-9">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin py-6 flex flex-col scroll-smooth">
               <div className="flex-1" />
               <div className="space-y-6">
                 {filteredMessages.map((msg) => (

@@ -42,6 +42,7 @@ interface ChatSidebarProps {
   joinedRooms: any[];
   onSelectRoom: (room: any) => void;
   selectedRoom: any | null;
+  onHomeClick: () => void;
 }
 
 const ChatSidebar = ({
@@ -75,6 +76,7 @@ const ChatSidebar = ({
   joinedRooms,
   onSelectRoom,
   selectedRoom,
+  onHomeClick,
 }: ChatSidebarProps) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newFriendName, setNewFriendName] = useState("");
@@ -100,11 +102,14 @@ const ChatSidebar = ({
 
   return (
     <>
-      <div className="w-80 h-full glass flex flex-col border-r border-white/[0.05] shrink-0">
+      <div className="w-[400px] h-full glass flex flex-col border-r border-white/[0.05] shrink-0">
       {/* Header */}
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3 select-none group">
+            <div 
+              onClick={onHomeClick}
+              className="flex items-center gap-3 select-none group cursor-pointer"
+            >
               <div className="relative w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl">
                 <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                 <img 

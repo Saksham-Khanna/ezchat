@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Mic } from "lucide-react";
+import { Play, Pause, Mic, Volume2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface VoicePlayerProps {
   src: string;
@@ -39,7 +40,7 @@ const VoicePlayer = ({ src, isOwn }: VoicePlayerProps) => {
     if (isPlaying) {
       audio.pause();
     } else {
-      audio.play();
+      audio.play().catch(e => console.error("Voice playback failed", e));
     }
     setIsPlaying(!isPlaying);
   };
@@ -63,70 +64,85 @@ const VoicePlayer = ({ src, isOwn }: VoicePlayerProps) => {
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Generate static waveform bars (deterministic from src hash)
-  const bars = 28;
+  // Generate responsive waveform bars
+  const bars = 36;
   const waveform = Array.from({ length: bars }, (_, i) => {
-    const seed = (i * 7 + src.length * 3 + i * i) % 100;
-    return 20 + (seed % 60); // height between 20% and 80%
+    const seed = (i * 13 + src.length * 7 + i * i) % 100;
+    return 30 + (seed % 60); 
   });
 
   return (
-    <div className="flex items-center gap-2.5 min-w-[220px]">
+    <div className={`flex items-center gap-4 min-w-[260px] p-3 rounded-2xl transition-all duration-300 ${
+      isOwn ? "bg-white/5" : "bg-black/20"
+    } border border-white/5`}>
       <audio ref={audioRef} src={src} preload="metadata" />
 
       {/* Play/Pause button */}
-      <button
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
         onClick={togglePlay}
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-xl relative overflow-hidden ${
           isOwn
-            ? "bg-white/20 hover:bg-white/30 text-white"
-            : "bg-primary/15 hover:bg-primary/25 text-primary"
+            ? "bg-white text-primary"
+            : "bg-primary text-white"
         }`}
       >
+        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50" />
         {isPlaying ? (
-          <Pause className="w-4 h-4" fill="currentColor" />
+          <Pause className="w-5 h-5 relative z-10" fill="currentColor" />
         ) : (
-          <Play className="w-4 h-4 ml-0.5" fill="currentColor" />
+          <Play className="w-5 h-5 ml-1 relative z-10" fill="currentColor" />
         )}
-      </button>
+      </motion.button>
 
-      {/* Waveform + progress */}
-      <div className="flex-1 flex flex-col gap-1">
+      {/* Waveform + Information */}
+      <div className="flex-1 flex flex-col gap-2">
+        <div className="flex items-center justify-between px-1">
+             <div className="flex items-center gap-1.5">
+                <Mic className={`w-3 h-3 ${isOwn ? "text-white/40" : "text-primary/60"}`} />
+                <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isOwn ? "text-white/40" : "text-primary/60"}`}>
+                    VOICE_STREAM
+                </span>
+             </div>
+             <span className={`text-[10px] font-mono font-black tabular-nums ${isOwn ? "text-white/60" : "text-primary/80"}`}>
+                {fmt(currentTime)} / {fmt(duration)}
+             </span>
+        </div>
+
         <div
           ref={progressRef}
           onClick={handleSeek}
-          className="relative flex items-end gap-[2px] h-6 cursor-pointer group"
+          className="relative flex items-center gap-[3px] h-8 cursor-pointer group"
         >
           {waveform.map((h, i) => {
             const barProgress = (i / bars) * 100;
             const isActive = barProgress < progress;
             return (
-              <div
+              <motion.div
                 key={i}
-                className={`flex-1 rounded-full transition-colors duration-150 ${
+                initial={{ height: "30%" }}
+                animate={{ height: `${h}%` }}
+                transition={{ duration: 0.5, delay: i * 0.01 }}
+                className={`flex-1 rounded-full transition-all duration-300 ${
                   isActive
                     ? isOwn
-                      ? "bg-white/90"
-                      : "bg-primary"
+                      ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"
+                      : "bg-primary shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]"
                     : isOwn
-                      ? "bg-white/25"
-                      : "bg-primary/25"
+                      ? "bg-white/10"
+                      : "bg-white/5"
                 }`}
-                style={{ height: `${h}%`, minWidth: "2px" }}
+                style={{ minWidth: "3px" }}
               />
             );
           })}
-        </div>
-
-        {/* Time */}
-        <div className="flex items-center justify-between">
-          <span
-            className={`text-[10px] font-mono tabular-nums ${
-              isOwn ? "text-white/60" : "text-muted-foreground"
-            }`}
-          >
-            {isPlaying || currentTime > 0 ? fmt(currentTime) : fmt(duration)}
-          </span>
+          
+          {/* Progress Overlay Glow */}
+          <div 
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none transition-all"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       </div>
     </div>

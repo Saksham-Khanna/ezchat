@@ -241,10 +241,13 @@ router.get('/history/:user1/:user2', async (req, res) => {
       .filter(msg => !msg.is_deleted && !msg.deleted_for.some(id => id.toString() === user1))
       .map(msg => {
         const msgObj = msg.toObject();
-        // If it was server-encrypted and NOT E2EE, decrypt it here for legacy support
-        if (!msg.is_encrypted) {
+        // Always try to decrypt if it looks like server-side ciphertext
+        if (msg.content && msg.content.startsWith('U2FsdGVkX1')) {
            try {
-             msgObj.content = decrypt(msg.content);
+             const decrypted = decrypt(msg.content);
+             if (decrypted && decrypted !== msg.content) {
+               msgObj.content = decrypted;
+             }
            } catch(e) {}
         }
         return msgObj;

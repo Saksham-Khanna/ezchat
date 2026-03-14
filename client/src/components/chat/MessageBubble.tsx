@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import type { Message } from "@/pages/Dashboard";
-import { Clock, Check, Download, Trash2, Reply, Pencil, Smile, Share2, Phone, Video, Lock as LockIcon, Image as ImageIcon } from "lucide-react";
+import { Clock, Check, Download, Trash2, Reply, Pencil, Smile, Share2, Phone, Video, Lock as LockIcon, Image as ImageIcon, FileText } from "lucide-react";
 import VoicePlayer from "./VoicePlayer";
 import { SOCKET_URL } from "@/lib/config";
 
@@ -33,16 +33,17 @@ const StatusIcon = ({ status }: { status?: string }) => {
   return <Check className="w-3 h-3 text-primary-foreground/40" />;
 };
 
+
 const getDocIcon = (url: string) => {
-  const ext = url.split('.').pop()?.toLowerCase();
-  if (ext === 'pdf') return '📕';
-  if (ext === 'doc' || ext === 'docx') return '📘';
-  if (ext === 'xls' || ext === 'xlsx') return '📗';
-  if (ext === 'txt') return '📄';
-  return '📄';
+  const ext = url.split('.').pop()?.split('?')[0].toLowerCase();
+  return ext || 'file';
 };
 
-const getDocName = (url: string) => {
+const getDocName = (message: Message) => {
+  if (message.content && message.content.startsWith('📄 ')) {
+    return message.content.substring(2);
+  }
+  const url = message.media_url || "";
   const parts = url.split('/');
   const filename = parts[parts.length - 1];
   const match = filename.match(/^doc_\d+_(.+)$/);
@@ -154,16 +155,9 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
         </div>
  
         <div className={`flex flex-col ${isOwn ? "items-end text-right order-2" : "items-start text-left order-1"}`}>
-          <div
-            className={`rounded-2xl text-sm leading-relaxed shadow-sm w-fit ${
-            isOwn
-                ? "gradient-primary text-primary-foreground rounded-br-sm shadow-primary/20"
-                : "bg-white/[0.06] border border-white/[0.08] text-foreground rounded-bl-sm"
-            } ${hasImage ? "p-1.5" : hasAudio ? "px-3 py-2.5" : hasDoc ? "px-3 py-2.5" : "px-4 py-2"} relative`}
-          >
           {/* Sender Name and Avatar for Groups */}
           {!isOwn && message.recipient_id?.startsWith('room_') && (
-            <div className="flex items-center gap-2 mb-1.5 px-0.5">
+            <div className="flex items-center gap-2 mb-1.5 px-2">
               <div className="w-5 h-5 rounded-md bg-primary/20 flex items-center justify-center overflow-hidden ring-1 ring-white/10">
                 {message.sender_avatar ? (
                   <img 
@@ -185,40 +179,46 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
             </div>
           )}
           <div
-            className={`relative px-4 py-2.5 rounded-[1.4rem] shadow-sm transition-all duration-300 ${
+            className={`relative rounded-[1.4rem] shadow-sm transition-all duration-300 ${
               isOwn
                 ? "bg-gradient-to-br from-primary to-primary-foreground/20 text-white rounded-tr-none shadow-primary/20 border border-white/10"
-                : "bg-white/[0.03] text-foreground rounded-tl-none border border-white/5"
-            } ${hasImage || hasCall || hasDoc ? "p-1.5" : ""}`}
+                : "bg-white/[0.06] border border-white/[0.08] text-foreground rounded-tl-none"
+            } ${hasImage || hasAudio || hasDoc || hasCall ? "p-1.5" : "px-4 py-2.5"}`}
             style={{ 
               boxShadow: isOwn ? '0 8px 24px -10px rgba(59, 130, 246, 0.4)' : '0 8px 24px -10px rgba(0, 0, 0, 0.2)'
             }}
           >
-          {!isOwn && (
+          {!isOwn && message.sender_name && !message.recipient_id?.startsWith('room_') && (
             <div className="flex items-center gap-2 mb-1 px-1">
-              {message.sender_name && (
-                <div className="text-[10px] font-black uppercase tracking-wider text-primary brightness-125">
-                  {message.sender_name}
-                </div>
-              )}
-              {message.is_encrypted && (
-                <LockIcon className="w-2.5 h-2.5 text-primary/40" />
-              )}
+              <div className="text-[10px] font-black uppercase tracking-wider text-primary brightness-125">
+                {message.sender_name}
+              </div>
             </div>
           )}
           {/* Reply Preview */}
           {message.reply_to && (
-            <div className={`mb-2 p-2 rounded-xl border-l-[3px] text-[11px] min-w-[140px] backdrop-blur-md ${isOwn ? "bg-white/10 border-white/40" : "bg-white/[0.04] border-primary/50"}`}>
-               <p className="font-black mb-0.5 opacity-60 text-[9px] uppercase tracking-widest">
+            <div className={`mb-2 p-2.5 rounded-2xl border-l-2 text-[11px] min-w-[160px] backdrop-blur-xl relative overflow-hidden group/reply ${
+              isOwn 
+                ? "bg-white/5 border-white/20 hover:bg-white/10" 
+                : "bg-primary/5 border-primary/30 hover:bg-primary/10"
+            } transition-all duration-300`}>
+               <div className="absolute top-0 right-0 p-1 opacity-10 group-hover/reply:opacity-30 transition-opacity">
+                  <Reply className="w-3 h-3" />
+               </div>
+               <p className={`font-black mb-1 text-[9px] uppercase tracking-widest ${isOwn ? "text-white/40" : "text-primary/60"}`}>
                  {message.reply_to.sender_id === currentUserId ? "You" : (message.sender_name || "Them")}
                </p>
-               <p className="opacity-70 truncate font-medium">{message.reply_to.content}</p>
+               <p className={`truncate font-semibold ${isOwn ? "text-white/70" : "text-foreground/70"}`}>
+                 {message.reply_to.content}
+               </p>
             </div>
           )}
           {message.is_forwarded && (
-            <div className="flex items-center gap-1.5 mb-1.5 text-[9px] font-black uppercase tracking-widest opacity-40 px-1">
+            <div className={`flex items-center gap-1.5 mb-2 text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md w-fit ${
+                isOwn ? "bg-white/5 text-white/40 border border-white/10" : "bg-primary/5 text-primary/60 border border-primary/10"
+            }`}>
               <Share2 className="w-2.5 h-2.5" />
-              <span>Forwarded</span>
+              <span>Forwarded_Packet</span>
             </div>
           )}
           {hasImage && (
@@ -250,22 +250,47 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
               href={getMediaSrc()}
               target="_blank"
               rel="noopener noreferrer"
-              className={`flex items-center gap-4 min-w-[220px] p-3 rounded-2xl transition-all duration-300 ${
-                isOwn ? "bg-white/10 hover:bg-white/15" : "bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 shadow-sm"
+              className={`group/doc flex items-center gap-4 min-w-[240px] p-2 rounded-[1.4rem] transition-all duration-500 overflow-hidden relative ${
+                isOwn 
+                  ? "bg-white/10 hover:bg-white/20 border border-white/10" 
+                  : "bg-[#0F111A]/40 hover:bg-[#0F111A]/60 border border-white/[0.08] backdrop-blur-md"
               }`}
             >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${isOwn ? "bg-white/10" : "bg-primary/10"}`}>
-                {getDocIcon(message.media_url!)}
+              {/* Animated glass shine on hover */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/doc:translate-x-full transition-transform duration-1000" />
+              
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center relative shrink-0 overflow-hidden transition-transform group-hover/doc:scale-105 duration-500 ${
+                isOwn ? "bg-white/10" : "bg-primary/20"
+              }`}>
+                {/* specialized file icons based on extension */}
+                {(() => {
+                  const ext = getDocIcon(message.media_url!);
+                  if (ext === 'pdf') return <div className="text-red-400 font-black text-[10px] scale-150 drop-shadow-lg">PDF</div>;
+                  if (['doc', 'docx'].includes(ext)) return <div className="text-blue-400 font-black text-[10px] scale-150 drop-shadow-lg">DOC</div>;
+                  if (['xls', 'xlsx'].includes(ext)) return <div className="text-green-400 font-black text-[10px] scale-150 drop-shadow-lg">XLS</div>;
+                  if (ext === 'zip' || ext === 'rar') return <div className="text-yellow-400 font-black text-[10px] scale-150 drop-shadow-lg">ZIP</div>;
+                  return <FileText className={`w-7 h-7 ${isOwn ? "text-white/40" : "text-primary/60"}`} />;
+                })()}
+                {/* subtle pulse glow for documents */}
+                <div className="absolute inset-0 bg-primary/10 animate-pulse-slow opacity-0 group-hover/doc:opacity-100 transition-opacity" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-[13px] font-bold truncate ${isOwn ? "text-white" : "text-foreground"}`}>
-                  {getDocName(message.media_url!)}
+
+              <div className="flex-1 min-w-0 pr-2">
+                <p className={`text-[13px] font-black truncate tracking-tight mb-0.5 ${isOwn ? "text-white" : "text-foreground"}`}>
+                  {getDocName(message)}
                 </p>
-                <p className={`text-[10px] mt-0.5 font-medium uppercase tracking-widest ${isOwn ? "text-white/40" : "text-muted-foreground/50"}`}>
-                   Document node
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 ${isOwn ? "text-white/40" : "text-primary/60"}`}>
+                    NODE_ASSET
+                  </span>
+                </div>
               </div>
-              <Download className={`w-4 h-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity ${isOwn ? "text-white" : "text-foreground"}`} />
+
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                isOwn ? "bg-white/5 text-white/40 group-hover/doc:bg-white/20 group-hover/doc:text-white" : "bg-white/5 text-primary/40 group-hover/doc:bg-primary/20 group-hover/doc:text-primary"
+              }`}>
+                <Download className="w-4 h-4" />
+              </div>
             </a>
           )}
           {hasCall && (
@@ -316,7 +341,6 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
             </div>
           )}
           </div>
-     </div>
           {/* Timestamp BELOW the bubble completely */}
           <div className={`flex flex-row items-center gap-1 mt-1 text-[10px] opacity-60 px-1 ${isOwn ? "justify-end text-right" : "justify-start text-left"}`}>
               {message.is_edited && <span className="italic mr-1">edited</span>}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import CryptoJS from "crypto-js";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import ChatSidebar from "@/components/chat/ChatSidebar";
@@ -152,6 +153,28 @@ const Dashboard = () => {
     setP2PFriends(prev => prev.map(f => f._id === friendId ? updater(f) : f));
   };
 
+  const decryptWithFallbacks = (content: string, userId: string, targetId: string) => {
+    if (!content || typeof content !== 'string' || !content.startsWith('U2FsdGVkX1')) return content;
+    const salt = "ezchat_premium_v2_salt";
+    const key = getConversationKey(userId, targetId);
+    const sorted = [userId, targetId].sort().join("_");
+    const fallbacks = [
+       CryptoJS.SHA256(userId + "_" + targetId + salt).toString(),
+       CryptoJS.SHA256(targetId + "_" + userId + salt).toString(),
+       CryptoJS.SHA256(sorted).toString(),
+       CryptoJS.SHA256(userId + "_" + targetId).toString(),
+       CryptoJS.SHA256(targetId + "_" + userId).toString(),
+       CryptoJS.SHA256(userId).toString(),
+       CryptoJS.SHA256(targetId).toString(),
+       "plain_text_mode",
+       "ezchat_premium_v2_salt",
+       userId,
+       targetId,
+       sorted
+    ];
+    return decryptMessage(content, key, fallbacks);
+  };
+ 
   const removeFriendFromState = (friendId: string) => {
     setDbFriends(prev => prev.filter(f => f._id !== friendId));
     setP2PFriends(prev => prev.filter(f => f._id !== friendId));
@@ -165,8 +188,7 @@ const Dashboard = () => {
     let finalContent = p2pMsg.content || "";
     // Only decrypt if it's a direct message (P2P is always direct here)
     if (!p2pMsg.recipient_id.startsWith('room_')) {
-      const key = getConversationKey(user.id, p2pMsg.sender_id);
-      finalContent = decryptMessage(finalContent, key);
+      finalContent = decryptWithFallbacks(finalContent, user.id, p2pMsg.sender_id);
     }
 
     const expires_at = p2pMsg.is_disappearing && p2pMsg.disappearing_duration 
@@ -527,9 +549,8 @@ const Dashboard = () => {
         console.log("Received a new message via socket:", data);
         
         let decryptedContent = data.content;
-        if (data.is_encrypted) {
-           const key = getConversationKey(parsedUser.id, data.sender_id);
-           decryptedContent = decryptMessage(data.content, key);
+        if (data.content && data.content.startsWith('U2FsdGVkX1')) {
+           decryptedContent = decryptWithFallbacks(data.content, parsedUser.id, data.sender_id);
            data.content = decryptedContent;
         }
 
@@ -812,37 +833,33 @@ const Dashboard = () => {
     }
   }, [navigate]);
 
-  // Fetch friends list (only added friends)
-  useEffect(() => {
-    if (user) {
-      fetch(`${SOCKET_URL}/api/auth/friends/${user.id}`)
-        .then(res => res.json())
-        .then(data => {
-          const seen = new Set();
-          const unique = data.filter((f: Friend) => {
-            if (seen.has(f._id)) return false;
-            seen.add(f._id);
-            return true;
-          });
-          
-          // Merge with P2P friends to keep them in the list
-          const merged = [...unique];
-          p2pFriends.forEach(p2p => {
-            if (!seen.has(p2p._id)) {
-              merged.push(p2p);
-              seen.add(p2p._id);
-            }
-          });
-          setFriends(merged);
-        })
-        .catch(err => console.error("Error fetching friends", err));
+  // Consolidate friend fetching and state management
+  const refreshFriends = () => {
+    if (!user) return;
+    fetch(`${SOCKET_URL}/api/auth/friends/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const seen = new Set();
+        const unique = data.filter((f: Friend) => {
+          if (!f || !f._id || seen.has(f._id)) return false;
+          seen.add(f._id);
+          return true;
+        });
+        setDbFriends(unique);
+      })
+      .catch(err => console.error("Error refreshing friends", err));
+  };
 
-      fetch(`${SOCKET_URL}/api/auth/requests/${user.id}`)
-        .then(res => res.json())
-        .then(data => setPendingRequests(data))
-        .catch(err => console.error("Error fetching requests", err));
-    }
-  }, [user]);
+  const refreshRequests = () => {
+    if (!user) return;
+    fetch(`${SOCKET_URL}/api/auth/requests/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setPendingRequests(data);
+      })
+      .catch(err => console.error("Error fetching requests", err));
+  };
 
   const refreshGroups = async () => {
     if (!user) return;
@@ -857,22 +874,7 @@ const Dashboard = () => {
     }
   };
 
-  const refreshFriends = () => {
-    if (!user) return;
-    fetch(`${SOCKET_URL}/api/auth/friends/${user.id}`)
-      .then(res => res.json())
-      .then(data => {
-        const seen = new Set();
-        const unique = data.filter((f: Friend) => {
-          if (!f || !f._id || seen.has(f._id)) return false;
-          seen.add(f._id);
-          return true;
-        });
-        setDbFriends(unique);
-      })
-      .catch(err => console.error("Error refreshing friends", err));
-  };
-
+  // Derive friends from both DB and P2P sources
   useEffect(() => {
     const seen = new Set<string>();
     const merged: Friend[] = [];
@@ -896,7 +898,7 @@ const Dashboard = () => {
     setFriends(merged);
   }, [dbFriends, p2pFriends]);
 
-  // Clean up P2P friends once they are in DB
+  // Clean up P2P friends once they are confirmed in DB
   useEffect(() => {
     if (dbFriends.length > 0 && p2pFriends.length > 0) {
       const dbIds = new Set(dbFriends.map(f => f._id));
@@ -910,9 +912,11 @@ const Dashboard = () => {
   useEffect(() => {
     if (user) {
       refreshFriends();
+      refreshRequests();
       refreshGroups();
       const interval = setInterval(() => {
         refreshFriends();
+        refreshRequests();
         refreshGroups();
       }, 30000);
       return () => clearInterval(interval);
@@ -934,10 +938,9 @@ const Dashboard = () => {
         .then(data => {
           // Decrypt if it's not a room and is encrypted
           if (!isRoom && selectedFriend) {
-            const key = getConversationKey(user.id, selectedFriend._id);
             data = data.map((msg: any) => {
-              if (msg.is_encrypted) {
-                return { ...msg, content: decryptMessage(msg.content, key) };
+              if (msg.content && msg.content.startsWith('U2FsdGVkX1')) {
+                return { ...msg, content: decryptWithFallbacks(msg.content, user.id, selectedFriend._id) };
               }
               return msg;
             });
@@ -1229,7 +1232,7 @@ const Dashboard = () => {
       sender_avatar: user.avatar_url,
       content: finalContent,
       reply_to: parentId,
-      is_e2ee: !isRoom,
+      is_e2ee: false, 
       is_disappearing: disappearingSettings.get(target._id) ? true : false,
       disappearing_duration: disappearingSettings.get(target._id) || 0
     };
@@ -2046,7 +2049,9 @@ const Dashboard = () => {
     pc.ontrack = (event) => {
       console.log("Received remote track:", event.track.kind, event.streams[0]?.id);
       if (event.streams && event.streams[0]) {
-        setRemoteStream(event.streams[0]);
+        // ALWAYS create a NEW MediaStream reference to force re-renders in hooks
+        const newStream = new MediaStream(event.streams[0]);
+        setRemoteStream(newStream);
       }
     };
 
@@ -2584,6 +2589,11 @@ const Dashboard = () => {
                   }
               }}
               selectedRoom={selectedRoom}
+              onHomeClick={() => {
+                setSelectedFriend(null);
+                setSelectedRoom(null);
+                setShowMembersPanel(false);
+              }}
             />
             
             <main className="flex-1 flex min-w-0 relative">
@@ -2790,7 +2800,7 @@ const Dashboard = () => {
             onEnd={handleEndCall}
             localStream={localStream}
             remoteStream={remoteStream}
-            onToggleVideo={() => {}}
+            onToggleVideo={handleToggleVideo}
           />
         )}
       </AnimatePresence>

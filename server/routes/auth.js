@@ -345,6 +345,15 @@ router.post('/add-friend-p2p', async (req, res) => {
     await user.save();
     await target.save();
 
+    // Clean up any friend requests between these two users
+    const FriendRequest = require('../models/FriendRequest');
+    await FriendRequest.deleteMany({
+      $or: [
+        { sender: userId, receiver: targetId },
+        { sender: targetId, receiver: userId }
+      ]
+    });
+
     // Notify both via socket
     const io = req.app.get('io');
     if (io) {
@@ -384,6 +393,15 @@ router.post('/respond-request', async (req, res) => {
       
       request.status = 'accepted';
       await request.save();
+
+      // Clean up any other mutual requests or duplicates
+      await FriendRequest.deleteMany({
+        _id: { $ne: requestId },
+        $or: [
+          { sender: request.sender, receiver: request.receiver },
+          { sender: request.receiver, receiver: request.sender }
+        ]
+      });
 
       // Notify users via socket to update friends list
       const io = req.app.get('io');
