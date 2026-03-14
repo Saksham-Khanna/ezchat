@@ -57,21 +57,74 @@ const CallOverlay = ({
 
   // Robustly attach streams
   useEffect(() => {
-    if (status === "connected" && remoteStream && remoteMediaRef.current) {
-        console.log("Attaching remote stream to media element", remoteStream.id);
-        remoteMediaRef.current.srcObject = remoteStream;
-        remoteMediaRef.current.muted = false; // Ensure remote is NOT muted
-        remoteMediaRef.current.play().catch(e => {
-            console.error("Remote media play failed, might need user gesture", e);
-            // Fallback: try to play muted and ask user to click if blocked
-        });
+    const remoteVideo = remoteMediaRef.current;
+    if (status === "connected" && remoteStream && remoteVideo) {
+        console.log("Attaching remote stream:", remoteStream.id, "Tracks:", remoteStream.getTracks().length);
+        
+        if (remoteVideo.srcObject !== remoteStream) {
+          remoteVideo.srcObject = remoteStream;
+        }
+
+        remoteVideo.muted = false;
+        
+        const playVideo = async () => {
+          try {
+            await remoteVideo.play();
+            console.log("Remote video playing successfully");
+          } catch (e) {
+            console.warn("Remote play failed, trying muted fallback...", e);
+            // If autoplay is blocked, sometimes we HAVE to start muted then unmute on click
+            // But usually User Acceptance of call counts as a gesture.
+          }
+        };
+
+        remoteVideo.onloadedmetadata = playVideo;
+        // Periodic check to ensure it's still playing if it's supposed to be
+        const playInterval = setInterval(() => {
+          if (remoteVideo.paused && isRemoteVideoActive) {
+            playVideo();
+          }
+        }, 2000);
+
+        return () => {
+          clearInterval(playInterval);
+          remoteVideo.onloadedmetadata = null;
+        }
     }
-  }, [status, remoteStream]);
+  }, [status, remoteStream, isRemoteVideoActive]);
+
+  // Listener for track enablement changes (WebRTC specific)
+  useEffect(() => {
+    if (!remoteStream) return;
+    
+    // We want to re-evaluate isRemoteVideoActive if tracks change
+    const handleTrackEvent = () => {
+      console.log("Track event detected (mute/unmute/ended)");
+      setDuration(d => d); 
+    };
+
+    const tracks = remoteStream.getTracks();
+    tracks.forEach(track => {
+      track.onmute = handleTrackEvent;
+      track.onunmute = handleTrackEvent;
+      track.onended = handleTrackEvent;
+    });
+
+    return () => {
+      tracks.forEach(track => {
+        track.onmute = null;
+        track.onunmute = null;
+        track.onended = null;
+      });
+    };
+  }, [remoteStream]);
 
   useEffect(() => {
     if (status === "connected" && localStream && localVideoRef.current) {
-        localVideoRef.current.srcObject = localStream;
-        localVideoRef.current.muted = true; // ALWAYS mute local for self
+        if (localVideoRef.current.srcObject !== localStream) {
+          localVideoRef.current.srcObject = localStream;
+        }
+        localVideoRef.current.muted = true;
         localVideoRef.current.play().catch(e => console.error("Local video play failed", e));
     }
   }, [status, localStream, isVideoOff]);
@@ -80,7 +133,7 @@ const CallOverlay = ({
     if (localStream) {
       const current = localStream.getAudioTracks()[0]?.enabled ?? true;
       localStream.getAudioTracks().forEach(track => track.enabled = !current);
-      setIsMuted(current); // if it was enabled, it's now muted
+      setIsMuted(current);
     }
   };
 
@@ -101,12 +154,12 @@ const CallOverlay = ({
     return `${mins}:${secs}`;
   };
 
-  const isRemoteVideoActive = remoteStream && remoteStream.getVideoTracks().some(t => t.enabled);
+  const isRemoteVideoActive = remoteStream && remoteStream.getVideoTracks().some(t => t.enabled && t.readyState !== 'ended');
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#020617] overflow-hidden">
       {/* Dynamic Background */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 select-none pointer-events-none">
          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/5 opacity-50" />
          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[radial-gradient(circle_at_center,rgba(var(--primary-rgb),0.1)_0%,transparent_70%)] animate-pulse-slow" />
       </div>
@@ -117,17 +170,17 @@ const CallOverlay = ({
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 z-10 w-full h-full"
+            className="absolute inset-0 z-10 w-full h-full bg-black flex items-center justify-center"
           >
             {/* Remote Media (Video or Placeholder for Audio) */}
             <video
               ref={remoteMediaRef}
               autoPlay
               playsInline
-              className={`w-full h-full object-cover transition-all duration-1000 ${isRemoteVideoActive ? 'opacity-100' : 'opacity-0 scale-110 blur-3xl'}`}
+              className={`w-full h-full min-w-full min-h-full object-cover transition-opacity duration-300 ${isRemoteVideoActive ? 'opacity-100' : 'opacity-0'}`}
             />
             {!isRemoteVideoActive && (
-                 <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/80 backdrop-blur-2xl">
+                 <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/80 backdrop-blur-2xl z-20">
                     <div className="relative">
                         <div className="w-48 h-48 rounded-full border-2 border-primary/20 flex items-center justify-center animate-pulse-glow">
                              {callerAvatar ? (
