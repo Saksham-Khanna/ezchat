@@ -88,12 +88,11 @@ const Auth = () => {
         {/* Logo Section */}
         <div className="text-center mb-8 animate-slide-up">
           <div className="relative inline-block mb-4">
-            <div className="relative flex items-center justify-center overflow-hidden h-40">
+            <div className="relative flex items-center justify-center overflow-hidden h-52">
               <img 
                 src="/full-logo.png" 
                 alt="ezchat Logo" 
                 className="h-full object-contain drop-shadow-2xl" 
-                style={{ mixBlendMode: 'screen' }}
               />
             </div>
           </div>

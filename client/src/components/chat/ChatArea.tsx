@@ -174,12 +174,11 @@ const ChatArea = ({
             </div>
             
             <div className="relative flex justify-center">
-              <div className="relative w-72 h-72 flex items-center justify-center">
+              <div className="relative w-80 h-80 flex items-center justify-center">
                 <img 
                   src="/full-logo.png" 
                   alt="ezchat" 
                   className="w-full h-full object-contain relative z-20 brand-logo drop-shadow-[0_0_35px_rgba(59,130,246,0.2)] transition-transform hover:scale-110 duration-700"
-                  style={{ mixBlendMode: 'screen' }}
                 />
               </div>
             </div>

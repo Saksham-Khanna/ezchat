@@ -115,11 +115,10 @@ const ChatSidebar = ({
                 <img 
                   src="/logo.png" 
                   alt="Logo" 
-                  className="w-full h-full object-contain relative z-10 scale-[2.4] translate-y-[6px]" 
-                  style={{ mixBlendMode: 'screen' }} 
+                  className="w-full h-full object-contain relative z-10 scale-[3.2] translate-y-[10px]" 
                 />
               </div>
-              <span className="font-black text-2xl tracking-tight gradient-text drop-shadow-sm leading-none">ezchat</span>
+              <span className="font-black text-3xl tracking-tight gradient-text drop-shadow-sm leading-none">ezchat</span>
             </div>
             <div className="flex items-center gap-2">
               <button
