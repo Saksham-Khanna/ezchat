@@ -220,17 +220,31 @@ const Auth = () => {
               disabled={loading}
               className="w-full py-4 rounded-2xl gradient-primary text-primary-foreground font-bold hover:opacity-90 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 shadow-xl shadow-primary/20 relative overflow-hidden group shimmer"
             >
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {isLogin ? "Authenticating..." : "Creating Profile..."}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-2">
-                  {isLogin ? "Secure Login" : "Complete Registration"}
-                  <Sparkles className="w-4 h-4 opacity-60" />
-                </span>
-              )}
+              <AnimatePresence mode="wait">
+                {loading ? (
+                  <motion.span 
+                    key="authenticating"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {isLogin ? "Authenticating..." : "Creating Profile..."}
+                  </motion.span>
+                ) : (
+                  <motion.span 
+                    key="secure-login"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="inline-flex items-center gap-2"
+                  >
+                    {isLogin ? "Secure Login" : "Complete Registration"}
+                    <Sparkles className="w-4 h-4 opacity-60" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
           </form>
 

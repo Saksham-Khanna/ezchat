@@ -33,13 +33,13 @@ const WifiSidebarItem = ({
             <Wifi className={`w-5 h-5 ${isActive ? "animate-pulse" : ""}`} />
           </div>
           <div>
-            <h3 className="text-xs font-black uppercase tracking-widest text-foreground flex items-center gap-2">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.12em] text-white/95 flex items-center gap-2 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
               P2P Protocol
               {isActive && (
-                <span className="flex h-1.5 w-1.5 rounded-full bg-online animate-pulse" />
+                <span className="flex h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
               )}
             </h3>
-            <p className="text-[10px] text-muted-foreground/60 font-bold uppercase tracking-tighter mt-0.5">
+            <p className="text-[9px] text-[#94a3b8]/60 font-black uppercase tracking-[0.05em] mt-0.5">
               Secure Mesh Networking
             </p>
           </div>
@@ -65,25 +65,25 @@ const WifiSidebarItem = ({
 
       <button
         onClick={onOpenPanel}
-        className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all duration-300 border ${
+        className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 border relative overflow-hidden group/portal ${
           isActive 
-            ? "border-primary/20 hover:bg-primary/10 text-primary" 
-            : "border-white/[0.05] hover:bg-white/[0.05] text-muted-foreground hover:text-foreground"
+            ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--primary),0.2)]" 
+            : "border-white/10 bg-white/[0.02] text-white/60 hover:text-white hover:bg-white/[0.05] hover:border-white/20"
         }`}
       >
-        <Radio className="w-3 h-3" />
-        {isActive ? "Scan for Mesh Peers" : "Discovery Portal"}
+        <Radio className={`w-3.5 h-3.5 transition-colors duration-300 ${isActive ? "text-primary" : "text-white/40 group-hover/portal:text-white"}`} />
+        <span className="relative z-10">{isActive ? "Scan for Mesh Peers" : "Discovery Portal"}</span>
       </button>
 
       {/* Mode Indicators */}
-      <div className="flex items-center justify-evenly w-full">
-        <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase transition-opacity duration-300 ${!isActive ? "opacity-100 text-accent/80" : "opacity-30"}`}>
-          <Zap className="w-3 h-3" />
+      <div className="flex items-center justify-evenly w-full px-2">
+        <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-500 ${!isActive ? "text-[#f59e0b] drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]" : "text-white/20"}`}>
+          <Zap className={`w-3.5 h-3.5 ${!isActive ? "animate-pulse" : ""}`} />
           Global Mode
         </div>
         <div className="w-1 h-1 rounded-full bg-white/10" />
-        <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase transition-opacity duration-300 ${isActive ? "opacity-100 text-primary" : "opacity-30"}`}>
-          <Wifi className="w-3 h-3" />
+        <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-500 ${isActive ? "text-[#0ea5e9] drop-shadow-[0_0_10px_rgba(14,165,233,0.4)]" : "text-white/20"}`}>
+          <Wifi className={`w-3.5 h-3.5 ${isActive ? "animate-pulse" : ""}`} />
           Mesh Mode
         </div>
       </div>

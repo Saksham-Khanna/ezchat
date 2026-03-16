@@ -3,7 +3,7 @@ import CryptoJS from "crypto-js";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import ChatSidebar from "@/components/chat/ChatSidebar";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import ChatArea from "@/components/chat/ChatArea";
 import ProfilePanel from "@/components/chat/ProfilePanel";
 import SharedMediaView from "@/components/chat/SharedMediaView";

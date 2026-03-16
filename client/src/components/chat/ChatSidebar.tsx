@@ -8,6 +8,7 @@ import type { Friend } from "@/pages/Dashboard";
 import SettingsPanel from "./SettingsPanel";
 import ConfirmDialog from "./ConfirmDialog";
 import WifiSidebarItem from "./wifi/WifiSidebarItem";
+import LogoutButton from "./LogoutButton";
 
 import { SOCKET_URL } from "@/lib/config";
 
@@ -121,13 +122,7 @@ const ChatSidebar = ({
               <span className="font-black text-3xl tracking-tight gradient-text drop-shadow-sm leading-none">ezchat</span>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={onLogout}
-                className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground transition-all duration-300 hover:scale-105 active:scale-95"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              <LogoutButton onLogout={onLogout} />
             </div>
           </div>
         </div>
