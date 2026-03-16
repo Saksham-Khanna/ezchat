@@ -142,6 +142,12 @@ const ChatArea = ({
   ];
 
   useEffect(() => {
+    if (isTyping || (groupTypingUsers && groupTypingUsers.length > 0)) {
+       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isTyping, groupTypingUsers?.length, messagesEndRef]);
+
+  useEffect(() => {
     if (!selectedFriend) {
       const interval = setInterval(() => {
         setFeatureIndex((prev) => (prev + 1) % features.length);
@@ -793,22 +799,13 @@ const ChatArea = ({
                   </div>
                 )}
                 {/* 1-on-1 typing */}
-                {(isTyping || isSelfTyping) && groupTypingUsers.length === 0 && (
+                {isTyping && (
                   <div className="flex flex-col gap-2 animate-fade-in py-2">
-                    {isTyping && (
-                      <div className="flex items-center gap-1.5 px-3.5 py-3 rounded-2xl glass border border-white/[0.05] w-fit">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/80 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    )}
-                    {isSelfTyping && (
-                      <div className="flex items-center gap-1.5 px-3.5 py-3 rounded-2xl gradient-primary border border-white/[0.05] w-fit self-end shadow-lg shadow-primary/10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5 px-3.5 py-3 rounded-2xl glass border border-white/[0.05] w-fit">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/80 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
                   </div>
                 )}
                 <div ref={messagesEndRef} />

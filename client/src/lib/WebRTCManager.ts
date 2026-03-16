@@ -14,6 +14,8 @@ export interface P2PMessage {
     timestamp?: string;
     is_disappearing?: boolean;
     disappearing_duration?: number;
+    username?: string;
+    avatar_url?: string;
 }
 
 export class WebRTCManager {

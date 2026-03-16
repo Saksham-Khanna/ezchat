@@ -91,7 +91,7 @@ const Dashboard = () => {
   const [newMessage, setNewMessage] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
-  const [typingUsers, setTypingUsers] = useState<Map<string, {username: string; avatar_url?: string}>>(new Map());
+  const [typingUsers, setTypingUsers] = useState<Map<string, {username: string; avatar_url?: string; targetId?: string}>>(new Map());
   const [searchQuery, setSearchQuery] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editingMsg, setEditingMsg] = useState<Message | null>(null);
@@ -148,6 +148,11 @@ const Dashboard = () => {
   const selectedFriendRef = useRef<Friend | null>(null);
   const selectedRoomRef = useRef<any | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const friendsRef = useRef<Friend[]>([]);
+
+  useEffect(() => {
+    friendsRef.current = friends;
+  }, [friends]);
 
   const updateFriendInState = (friendId: string, updater: (f: Friend) => Friend) => {
     setDbFriends(prev => prev.map(f => f._id === friendId ? updater(f) : f));
@@ -214,8 +219,11 @@ const Dashboard = () => {
       if (p2pMsg.is_typing) {
         setTypingUsers(prev => {
            const next = new Map(prev);
-           // P2P messages might lack username/avatar_url, so gracefully fall back if unavailable
-           next.set(p2pMsg.sender_id, { username: 'Someone' });
+           next.set(p2pMsg.sender_id, { 
+             username: p2pMsg.username || 'Someone', 
+             avatar_url: p2pMsg.avatar_url,
+             targetId: p2pMsg.recipient_id 
+           });
            return next;
         });
       } else {
@@ -686,29 +694,25 @@ const Dashboard = () => {
         }
       });
 
-      newSocket.on("user_typing", (data: { userId: string; is_typing: boolean; username?: string; avatar_url?: string }) => {
+      newSocket.on("user_typing", (data: { userId: string; is_typing: boolean; recipientId?: string; username?: string; avatar_url?: string }) => {
+        const typingId = data.userId || (data as any).sender_id;
+        if (!typingId) return;
+
         setTypingUsers(prev => {
           const next = new Map(prev);
           if (data.is_typing) {
-            // Try to look up the real avatar from populated roomMembers
-            let resolvedAvatar = data.avatar_url;
-            let resolvedUsername = data.username || 'Someone';
-            const currentRoomId = selectedRoomRef.current?.room_id;
-            if (currentRoomId) {
-              const members = roomMembersRef.current.get(currentRoomId) || [];
-              const found = members.find((m: any) => {
-                const uid = m.userId?._id || m.userId;
-                return uid?.toString() === data.userId;
-              });
-              if (found) {
-                const mu = found.userId;
-                resolvedAvatar = mu?.avatar_url || resolvedAvatar;
-                resolvedUsername = mu?.username || resolvedUsername;
-              }
-            }
-            next.set(data.userId, { username: resolvedUsername, avatar_url: resolvedAvatar });
+            // Find real data from friends list as fallback using ref to avoid stale closure
+            const friend = friendsRef.current.find(f => f._id === typingId);
+            const resolvedUsername = data.username || friend?.username || 'Someone';
+            const resolvedAvatar = data.avatar_url || friend?.avatar_url;
+            
+            next.set(typingId, { 
+              username: resolvedUsername, 
+              avatar_url: resolvedAvatar,
+              targetId: data.recipientId 
+            });
           } else {
-            next.delete(data.userId);
+            next.delete(typingId);
           }
           return next;
         });
@@ -2377,13 +2381,21 @@ const Dashboard = () => {
       const isRoom = target._id.startsWith('room_');
       if (isRoom) {
          // Broadcast to socket for rooms, simpler than P2P for every member
-         socket.emit('typing', { sender_id: user.id, recipient_id: target._id, is_typing: isTyping });
+         socket.emit('typing', { 
+           sender_id: user.id, 
+           recipient_id: target._id, 
+           is_typing: isTyping,
+           username: user.username,
+           avatar_url: user.avatar_url 
+         });
       } else {
         webrtcManagerRef.current?.sendMessage(target._id, {
           type: "typing",
           sender_id: user.id,
           recipient_id: target._id,
-          is_typing: isTyping
+          is_typing: isTyping,
+          username: user.username,
+          avatar_url: user.avatar_url
         });
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         if (isTyping) {
@@ -2392,9 +2404,11 @@ const Dashboard = () => {
               type: "typing",
               sender_id: user.id,
               recipient_id: target._id,
-              is_typing: false
+              is_typing: false,
+              username: user.username,
+              avatar_url: user.avatar_url
             });
-          }, 2000);
+          }, 2500);
         }
       }
     } else {
@@ -2403,7 +2417,7 @@ const Dashboard = () => {
       if (isTyping) {
         typingTimeoutRef.current = setTimeout(() => {
           socket.emit('typing', { sender_id: user.id, recipient_id: target._id, is_typing: false, username: user.username, avatar_url: user.avatar_url });
-        }, 1500);
+        }, 2000);
       }
     }
   };
@@ -2669,8 +2683,17 @@ const Dashboard = () => {
                 onUnfriend={handleUnfriend}
                 onClearChat={handleClearChat}
                 messagesEndRef={messagesEndRef}
-                isTyping={selectedFriend && selectedFriend.cv_id !== 'Group' ? typingUsers.has(selectedFriend._id) : false}
-                groupTypingUsers={selectedRoom ? Array.from(typingUsers.values()) : []}
+                isTyping={(() => {
+                  if (!selectedFriend || selectedFriend.cv_id === 'Group') return false;
+                  return typingUsers.has(selectedFriend._id);
+                })()}
+                groupTypingUsers={(() => {
+                  if (selectedRoom) {
+                    const roomId = selectedRoom.room_id || selectedRoom._id;
+                    return Array.from(typingUsers.values()).filter(u => u.targetId === roomId);
+                  }
+                  return [];
+                })()}
                 isSelfTyping={newMessage.length > 0}
                 currentUserId={user.id}
                 chatMode={chatMode}

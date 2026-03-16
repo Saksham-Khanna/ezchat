@@ -140,6 +140,7 @@ io.on('connection', (socket) => {
     if (recipient_id) {
       io.to(recipient_id).emit('user_typing', {
         userId: data.sender_id?.toString(),
+        recipientId: recipient_id,
         is_typing: data.is_typing,
         username: data.username,
         avatar_url: data.avatar_url,
