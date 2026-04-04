@@ -100,7 +100,7 @@ const Dashboard = () => {
   // WiFi Mode State
   const [chatMode, setChatMode] = useState<"internet" | "wifi">("internet");
   const [showWiFiPanel, setShowWiFiPanel] = useState(false);
-  const [wifiName, setWifiName] = useState("");
+  const [wifiName] = useState("local");
   const [nearbyUsers, setNearbyUsers] = useState<any[]>([]);
   const [discoveredUsers, setDiscoveredUsers] = useState<any[]>([]);
   const [p2pFriends, setP2PFriends] = useState<Friend[]>([]);
@@ -150,13 +150,47 @@ const Dashboard = () => {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const friendsRef = useRef<Friend[]>([]);
 
+  const handleCreateGroup = (name: string, MemberIds: string[]) => {
+    if (!socket || !user) return;
+    socket.emit("create_room", { 
+      roomName: name, 
+      creatorId: user.id || (user as any)._id,
+      memberIds: MemberIds 
+    });
+    toast({
+      title: "Initiating Group",
+      description: "Requesting mesh protocol and encrypting channel...",
+    });
+  };
+
   useEffect(() => {
     friendsRef.current = friends;
   }, [friends]);
 
+  // Heartbeat to keep presence alive (every 2 minutes)
+  useEffect(() => {
+    if (!socket || !user) return;
+    
+    const interval = setInterval(() => {
+      socket.emit('heartbeat', user.id || (user as any)._id);
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => clearInterval(interval);
+  }, [socket, user]);
+
+  // Theme support: Apply .light-mode class to html element
+  useEffect(() => {
+    if (settings?.theme === 'light') {
+      document.documentElement.classList.add('light-mode');
+    } else {
+      document.documentElement.classList.remove('light-mode');
+    }
+  }, [settings?.theme]);
+
   const updateFriendInState = (friendId: string, updater: (f: Friend) => Friend) => {
-    setDbFriends(prev => prev.map(f => f._id === friendId ? updater(f) : f));
-    setP2PFriends(prev => prev.map(f => f._id === friendId ? updater(f) : f));
+    const targetId = String(friendId);
+    setDbFriends(prev => prev.map(f => String(f._id) === targetId ? updater(f) : f));
+    setP2PFriends(prev => prev.map(f => String(f._id) === targetId ? updater(f) : f));
   };
 
   const decryptWithFallbacks = (content: string, userId: string, targetId: string) => {
@@ -310,6 +344,22 @@ const Dashboard = () => {
       setUser(parsedUser);
       if (parsedUser.settings) setSettings(parsedUser.settings);
       
+      // Fetch fresh profile data
+      const syncProfile = async () => {
+        try {
+          const response = await fetch(`${SOCKET_URL.replace('/socket.io', '')}/api/auth/profile/${parsedUser.id || parsedUser._id}`);
+          if (response.ok) {
+            const freshUser = await response.json();
+            setUser(freshUser);
+            localStorage.setItem("user", JSON.stringify(freshUser));
+            if (freshUser.settings) setSettings(freshUser.settings);
+          }
+        } catch (err) {
+          console.error("Profile sync failed:", err);
+        }
+      };
+      syncProfile();
+      
       // Check if PIN lock is needed
       if (parsedUser.is_pin_enabled) {
         setIsLocked(true);
@@ -320,8 +370,8 @@ const Dashboard = () => {
       
       // Initialize Socket with reconnection options
       const newSocket = io(SOCKET_URL, {
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
+        reconnectionAttempts: 50, // Much more resilient for unstable connections
+        reconnectionDelay: 2000,
       });
       setSocket(newSocket);
       
@@ -361,9 +411,9 @@ const Dashboard = () => {
       
       newSocket.on("connect", () => {
         console.log("Socket connected:", newSocket.id);
-        newSocket.emit("join", parsedUser.id);
-        
-        // Auto-join WiFi discovery to populate available rooms for the sidebar
+        newSocket.emit("join", parsedUser.id || parsedUser._id);
+        refreshFriends(); // Get latest DB status immediately on sync
+        refreshRequests();
         newSocket.emit("join_wifi", {
           wifiName: wifiName || "local",
           userId: parsedUser.id,
@@ -685,10 +735,7 @@ const Dashboard = () => {
       });
 
       newSocket.on("friend_status", (data: { userId: string; is_online: boolean }) => {
-        console.log("Friend status changed:", data);
-        setFriends(prev => prev.map(f =>
-          f._id === data.userId ? { ...f, is_online: data.is_online } : f
-        ));
+        updateFriendInState(data.userId, (f) => ({ ...f, is_online: data.is_online }));
         if (selectedFriendRef.current?._id === data.userId) {
           setSelectedFriend(prev => prev ? { ...prev, is_online: data.is_online } : null);
         }
@@ -892,17 +939,19 @@ const Dashboard = () => {
 
     // Prioritize DB friends
     dbFriends.forEach(f => {
-      if (f && f._id && !seen.has(f._id)) {
+      const idStr = f && f._id ? String(f._id) : null;
+      if (idStr && !seen.has(idStr)) {
         merged.push(f);
-        seen.add(f._id);
+        seen.add(idStr);
       }
     });
 
     // Add P2P friends not already in DB list
     p2pFriends.forEach(p2p => {
-      if (p2p && p2p._id && !seen.has(p2p._id)) {
+      const idStr = p2p && p2p._id ? String(p2p._id) : null;
+      if (idStr && !seen.has(idStr)) {
         merged.push(p2p);
-        seen.add(p2p._id);
+        seen.add(idStr);
       }
     });
 
@@ -929,10 +978,25 @@ const Dashboard = () => {
         refreshFriends();
         refreshRequests();
         refreshGroups();
-      }, 30000);
+      }, 15000); // 15 seconds sync as fallback for multi-server setups
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  // Handle automatic re-joining of WiFi/Mesh network when the ID/Name changes
+  useEffect(() => {
+    if (socket && user) {
+      socket.emit("join_wifi", {
+        wifiName: wifiName || "local",
+        userId: user.id,
+        username: user.username,
+        avatar_url: user.avatar_url,
+        cv_id: user.cv_id
+      });
+      // Also trigger an immediate scan if we just changed the network
+      socket.emit("scan_wifi_network", { wifiName: wifiName || "local" });
+    }
+  }, [wifiName, socket, user]);
 
   // Fetch history when context changes (both for friends and rooms)
   useEffect(() => {
@@ -2497,9 +2561,11 @@ const Dashboard = () => {
 
   const handleScan = () => {
     setIsRefreshing(true);
-    socket?.emit("scan_wifi_network", { wifiName });
+    const targetNet = wifiName || "local";
+    socket?.emit("scan_wifi_network", { wifiName: targetNet });
     
     setTimeout(() => {
+      // Commit the buffered nearby users to the discovery view
       const latest = nearbyUsersRef.current;
       setDiscoveredUsers([...latest]);
       setHasScanned(true);
@@ -2508,7 +2574,7 @@ const Dashboard = () => {
         title: "Scan Complete", 
         description: `Found ${latest.length} users nearby` 
       });
-    }, 2000);
+    }, 1500); // Slightly faster scan feel
   };
 
   const handleP2PRequest = (targetId: string) => {
@@ -2648,6 +2714,7 @@ const Dashboard = () => {
                 setSelectedRoom(null);
                 setShowMembersPanel(false);
               }}
+              onCreateGroup={handleCreateGroup}
             />
             
             <main className="flex-1 flex min-w-0 relative">
@@ -2761,7 +2828,7 @@ const Dashboard = () => {
           <WiFiDiscoveryPanel
             onClose={() => setShowWiFiPanel(false)}
             wifiName={wifiName}
-            onSetWifiName={setWifiName}
+
             nearbyUsers={discoveredUsers}
             isScanning={isRefreshing}
             onScan={handleScan}

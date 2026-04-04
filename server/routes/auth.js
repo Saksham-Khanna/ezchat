@@ -89,6 +89,28 @@ router.get('/suggest-username', async (req, res) => {
   }
 });
 
+// Get Profile
+router.get('/profile/:userId', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      bio: user.bio,
+      cv_id: user.cv_id,
+      settings: user.settings,
+      is_online: user.is_online,
+      is_pin_enabled: user.is_pin_enabled
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching profile' });
+  }
+});
+
 // Login
 router.post('/login', async (req, res) => {
   try {

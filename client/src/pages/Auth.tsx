@@ -102,8 +102,10 @@ const Auth = () => {
         <div className="glass-card border-beam rounded-3xl p-8 shadow-2xl animate-scale-in" style={{ animationDelay: '0.15s' }}>
           <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
-              <div className="space-y-2 animate-fade-in">
-                <label className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em] ml-1">Username</label>
+              <div className="space-y-3 animate-fade-in">
+                <label className="text-sm font-medium text-muted-foreground ml-1">
+                  Username
+                </label>
                 <div className="relative group flex items-center gap-2">
                   <div className="relative flex-1">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 group-focus-within:text-primary transition-colors duration-300" />
@@ -178,8 +180,10 @@ const Auth = () => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em] ml-1">Email Address</label>
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-muted-foreground ml-1">
+                Email Address
+              </label>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 group-focus-within:text-primary transition-colors duration-300" />
                 <input
@@ -193,8 +197,10 @@ const Auth = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em] ml-1">Password</label>
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-muted-foreground ml-1">
+                Password
+              </label>
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 group-focus-within:text-primary transition-colors duration-300" />
                 <input
@@ -218,7 +224,7 @@ const Auth = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 rounded-2xl gradient-primary text-primary-foreground font-bold hover:opacity-90 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 shadow-xl shadow-primary/20 relative overflow-hidden group shimmer"
+              className="w-full py-4 rounded-2xl gradient-primary text-primary-foreground font-bold hover:opacity-90 transition-all disabled:opacity-50 relative overflow-hidden group shadow-xl shadow-primary/20"
             >
               <AnimatePresence mode="wait">
                 {loading ? (
@@ -240,11 +246,20 @@ const Auth = () => {
                     exit={{ opacity: 0, y: -10 }}
                     className="inline-flex items-center gap-2"
                   >
-                    {isLogin ? "Secure Login" : "Complete Registration"}
-                    <Sparkles className="w-4 h-4 opacity-60" />
+                    {isLogin ? "Login" : "Complete Registration"}
                   </motion.span>
                 )}
               </AnimatePresence>
+
+              {/* Progress Bar Animation */}
+              {loading && (
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: "100%" }}
+                  className="absolute bottom-0 left-0 h-[3px] bg-white shadow-[0_0_15px_rgba(255,255,255,1)]"
+                  transition={{ duration: 4, ease: "linear" }}
+                />
+              )}
             </button>
           </form>
 

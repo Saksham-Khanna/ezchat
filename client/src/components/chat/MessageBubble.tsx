@@ -16,6 +16,8 @@ interface MessageBubbleProps {
   onForward: () => void;
   onStartCall?: (type: "audio" | "video") => void;
   currentUserId: string;
+  onScrollToRepliedMessage?: (id: string) => void;
+  isHighlighted?: boolean;
 }
 
 const StatusIcon = ({ status }: { status?: string }) => {
@@ -50,7 +52,7 @@ const getDocName = (message: Message) => {
   return match ? match[1] : filename;
 };
 
-const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdit, onReact, onForward, onStartCall, currentUserId }: MessageBubbleProps) => {
+const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdit, onReact, onForward, onStartCall, currentUserId, onScrollToRepliedMessage, isHighlighted }: MessageBubbleProps) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -112,12 +114,27 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
 
   return (
     <motion.div 
+      id={`msg-${message._id}`}
       initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ 
+        opacity: 1, 
+        y: 0,
+        scale: isHighlighted ? 1.02 : 1,
+        transition: { type: "spring", stiffness: 300, damping: 20 }
+      }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className={`flex ${isOwn ? "justify-end" : "justify-start"} group w-full relative`}
+      className={`flex ${isOwn ? "justify-end" : "justify-start"} group w-full relative transition-all duration-500 ${isHighlighted ? "z-50" : "z-0"}`}
     >
       <div className={`relative flex items-end gap-2 max-w-[75%] flex-row`}>
+        {/* Highlight Pulse Effect */}
+        {isHighlighted && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: [0, 0.4, 0], scale: [0.9, 1.1, 1.3] }}
+            transition={{ duration: 1.5, repeat: 1 }}
+            className="absolute inset-0 bg-primary/20 blur-2xl rounded-full -z-10"
+          />
+        )}
         {/* Interaction buttons — appear on hover */}
         <div className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200 shrink-0 pb-1 ${isOwn ? "order-1" : "order-2"}`}>
           <div className="flex items-center gap-0.5 px-1 py-0.5 rounded-full bg-secondary/80 backdrop-blur-sm border border-white/[0.05] shadow-lg">
@@ -179,11 +196,11 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
             </div>
           )}
           <div
-            className={`relative rounded-[1.4rem] shadow-sm transition-all duration-300 ${
+            className={`relative rounded-[1.4rem] shadow-sm transition-all duration-500 ${
               isOwn
                 ? "bg-gradient-to-br from-primary to-primary-foreground/20 text-white rounded-tr-none shadow-primary/20 border border-white/10"
                 : "bg-white/[0.06] border border-white/[0.08] text-foreground rounded-tl-none"
-            } ${hasImage || hasAudio || hasDoc || hasCall ? "p-1.5" : "px-4 py-2.5"}`}
+            } ${isHighlighted ? "ring-4 ring-primary/40 shadow-[0_0_40px_rgba(59,130,246,0.3)] scale-[1.02]" : ""} ${hasImage || hasAudio || hasDoc || hasCall ? "p-1.5" : "px-4 py-2.5"}`}
             style={{ 
               boxShadow: isOwn ? '0 8px 24px -10px rgba(59, 130, 246, 0.4)' : '0 8px 24px -10px rgba(0, 0, 0, 0.2)'
             }}
@@ -197,7 +214,9 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
           )}
           {/* Reply Preview */}
           {message.reply_to && (
-            <div className={`mb-2 p-2.5 rounded-2xl border-l-2 text-[11px] min-w-[160px] backdrop-blur-xl relative overflow-hidden group/reply ${
+            <div 
+              onClick={() => onScrollToRepliedMessage?.(message.reply_to!._id)}
+              className={`mb-2 p-2.5 rounded-2xl border-l-2 text-[11px] min-w-[160px] backdrop-blur-xl relative overflow-hidden group/reply cursor-pointer active:scale-95 ${
               isOwn 
                 ? "bg-white/5 border-white/20 hover:bg-white/10" 
                 : "bg-primary/5 border-primary/30 hover:bg-primary/10"

@@ -2,6 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
+const dns = require('dns');
+
+// Fix for MongoDB connection issues (ECONNREFUSED)
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 require('dotenv').config();
 
 const app = express();
@@ -24,14 +30,15 @@ const Group = require('./models/Group');
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('Successfully connected to MongoDB.');
-    // Reset all users to offline on startup to handle crashes
-    try {
-      await User.updateMany({}, { is_online: false });
-      console.log('All users reset to offline status on startup.');
-    } catch (err) {
-      console.error('Error resetting user status:', err);
-    }
     
+    // Reset all users to offline on server startup to prevent stale 'online' status
+    try {
+      const resetResult = await User.updateMany({}, { is_online: false });
+      console.log(`Presence Reset: Marked ${resetResult.modifiedCount} users as offline.`);
+    } catch (err) {
+      console.error('Error during startup presence reset:', err);
+    }
+
     startServer(PORT);
   })
   .catch((error) => console.error('MongoDB connection error:', error));
@@ -73,11 +80,21 @@ const roomManager = require('./roomManager');
 const roleManager = require('./roleManager');
 
 const getNetworkId = (socket) => {
-  return 'global_network';
+  return 'local';
 };
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
+
+  socket.on('heartbeat', async (userId) => {
+    if (userId) {
+      try {
+        await User.findByIdAndUpdate(userId, { last_seen: new Date() });
+      } catch (err) {
+        console.error('Heartbeat update error:', err);
+      }
+    }
+  });
 
   socket.on('join', async (userId) => {
     if (userId) {
@@ -87,7 +104,11 @@ io.on('connection', (socket) => {
 
       // Mark user as online in DB
       try {
-        const user = await User.findByIdAndUpdate(userId, { is_online: true }, { new: true })
+        // Explicitly update is_online AND last_seen (heartbeat)
+        const user = await User.findByIdAndUpdate(userId, { 
+          is_online: true,
+          last_seen: new Date()
+        }, { new: true })
           .populate('friends', '_id');
         if (user && user.friends) {
           // Notify all friends that this user is now online
@@ -195,15 +216,16 @@ io.on('connection', (socket) => {
 
       if (!isStillConnected) {
         console.log(`User ${userId} has no more active connections. Marking offline.`);
-        // No more connections for this user — mark offline in DB
         try {
           const user = await User.findByIdAndUpdate(userId, { 
             is_online: false,
             last_seen: new Date() 
           }, { new: true })
             .populate('friends', '_id');
+          
           if (user && user.friends) {
-            // Notify all friends that this user is now offline
+            // Self-correction: The change stream below will handle global broadcasts
+            // but we still emit here for low-latency on the SAME server
             user.friends.forEach(friend => {
               io.to(friend._id.toString()).emit('friend_status', {
                 userId: userId,
@@ -215,11 +237,66 @@ io.on('connection', (socket) => {
         } catch (err) {
           console.error('Error setting user offline:', err);
         }
-      } else {
-        console.log(`User ${userId} still has other active connections.`);
       }
     }
   });
+
+  // --- Real-time Status Sync via MongoDB Change Streams ---
+  // This allows multiple server instances (local + prod) to sync online status
+  // even if they don't share a socket network.
+  try {
+    const userChangeStream = User.watch([], { fullDocument: 'updateLookup' });
+    userChangeStream.on('change', async (change) => {
+      if (change.operationType === 'update') {
+        const fields = change.updateDescription.updatedFields;
+        // Trigger on any status or heartbeat change
+        if (fields.is_online !== undefined || fields.last_seen !== undefined) {
+          const userId = change.documentKey._id.toString();
+          const isOnline = change.fullDocument.is_online;
+          const lastSeen = change.fullDocument.last_seen;
+          
+          // Broadcast globally so all server instances can tell their local clients
+          // The frontend will filter this and only update if the user is a friend
+          io.emit('friend_status', {
+            userId: userId,
+            is_online: isOnline,
+            last_seen: lastSeen
+          });
+        }
+      }
+    });
+
+    // --- Heartbeat Cleanup ---
+    // Periodically checks for users marked 'online' who haven't sent a heartbeat/join in 5 minutes.
+    setInterval(async () => {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      try {
+        const staleUsers = await User.find({ 
+          is_online: true, 
+          last_seen: { $lt: fiveMinutesAgo } 
+        });
+
+        if (staleUsers.length > 0) {
+          console.log(`Heartbeat Cleanup: Found ${staleUsers.length} stale sessions.`);
+          for (const user of staleUsers) {
+            await User.findByIdAndUpdate(user._id, { is_online: false });
+            io.emit('friend_status', {
+              userId: user._id.toString(),
+              is_online: false,
+              last_seen: user.last_seen
+            });
+            console.log(`User ${user.username} (${user._id}) marked offline due to inactivity.`);
+          }
+        }
+      } catch (err) {
+        console.error('Heartbeat cleanup error:', err);
+      }
+    }, 60 * 1000); // Run every minute
+
+    console.log('User status Change Stream and Heartbeat active.');
+  } catch (err) {
+    console.warn('MongoDB Change Stream failed (likely non-replica set):', err.message);
+  }
 
   socket.on('edit_message', (data) => {
     // data: { messageId, sender_id, recipient_id, content }

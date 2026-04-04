@@ -102,7 +102,7 @@ const VoicePlayer = ({ src, isOwn }: VoicePlayerProps) => {
              <div className="flex items-center gap-1.5">
                 <Mic className={`w-3 h-3 ${isOwn ? "text-white/40" : "text-primary/60"}`} />
                 <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isOwn ? "text-white/40" : "text-primary/60"}`}>
-                    VOICE_STREAM
+                    VOICE_MESSAGE
                 </span>
              </div>
              <span className={`text-[10px] font-mono font-black tabular-nums ${isOwn ? "text-white/60" : "text-primary/80"}`}>

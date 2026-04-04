@@ -45,26 +45,26 @@ const WifiSidebarItem = ({
           </div>
         </div>
 
-        {/* Improved Toggle Switch */}
-        <button 
-          onClick={() => onToggle(!isActive)}
-          className={`relative w-11 h-6 rounded-full transition-all duration-300 focus:outline-none ${
-            isActive ? "bg-primary" : "bg-white/[0.1] border border-white/[0.05]"
-          }`}
-        >
-          <motion.div 
-            animate={{ x: isActive ? 22 : 4 }}
-            className={`absolute top-1 w-4 h-4 rounded-full shadow-sm transition-colors ${
-              isActive ? "bg-white" : "bg-muted-foreground/40"
-            }`}
-          />
-        </button>
+        {/* Protocol Status Badge */}
+        <div className={`px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${
+          isActive 
+            ? "bg-primary/10 border-primary/20 text-primary shadow-[0_0_15px_rgba(var(--primary),0.2)]" 
+            : "bg-white/[0.03] border-white/[0.05] text-muted-foreground/40"
+        }`}>
+          {isActive ? "ENCRYPTED" : "STANDBY"}
+        </div>
       </div>
 
       <div className="h-px bg-white/[0.04] w-full" />
 
       <button
-        onClick={onOpenPanel}
+        onClick={() => {
+          if (!isActive) {
+            onToggle(true);
+          } else {
+            onOpenPanel();
+          }
+        }}
         className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 border relative overflow-hidden group/portal ${
           isActive 
             ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--primary),0.2)]" 
@@ -72,7 +72,7 @@ const WifiSidebarItem = ({
         }`}
       >
         <Radio className={`w-3.5 h-3.5 transition-colors duration-300 ${isActive ? "text-primary" : "text-white/40 group-hover/portal:text-white"}`} />
-        <span className="relative z-10">{isActive ? "Scan for Mesh Peers" : "Discovery Portal"}</span>
+        <span className="relative z-10">{isActive ? "Scan for Mesh Peers" : "Initiate Mesh Protocol"}</span>
       </button>
 
       {/* Mode Indicators */}

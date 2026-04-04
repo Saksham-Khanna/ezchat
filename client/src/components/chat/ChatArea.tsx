@@ -5,7 +5,8 @@ import {
   File, Download, Play, Check, CheckCheck, Trash2,
   Reply, Forward, SmilePlus, Edit2, CornerUpRight,
   Mic, Square, Loader2, Wifi, WifiOff, Globe, UserCircle,
-  Pencil, Lock as LockIcon, SendHorizonal, Plus, RotateCcw, Clock
+  Pencil, Lock as LockIcon, SendHorizonal, Plus, RotateCcw, Clock,
+  MessageSquare
 } from "lucide-react";
 import type { Friend, Message } from "@/pages/Dashboard";
 import MessageBubble from "./MessageBubble";
@@ -98,6 +99,7 @@ const ChatArea = ({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+
   const [confirmAction, setConfirmAction] = useState<{ type: 'unfriend' | 'block' | 'clear'; friendId: string; friendName: string } | null>(null);
   const [previewFiles, setPreviewFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -140,6 +142,22 @@ const ChatArea = ({
     "Instant File & Image Sharing",
     "Dynamic Profile Customization"
   ];
+
+  // Reply Navigation & Highlight State
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  const handleScrollToRepliedMessage = (messageId: string) => {
+    const element = document.getElementById(`msg-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMessageId(messageId);
+      
+      // Clear highlight after animation completes
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 2000);
+    }
+  };
 
   useEffect(() => {
     if (isTyping || (groupTypingUsers && groupTypingUsers.length > 0)) {
@@ -513,44 +531,44 @@ const ChatArea = ({
         <div className="max-w-4xl mx-auto w-full px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
-            {selectedFriend.cv_id === 'Group' ? (
+            {selectedFriend?.cv_id === 'Group' ? (
               /* Group icon */
               <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-black text-lg">
-                {selectedFriend.username?.charAt(0).toUpperCase()}
+                {selectedFriend?.username?.charAt(0)?.toUpperCase() || '?'}
               </div>
             ) : (
               <div className={`w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground font-medium overflow-hidden ring-2 transition-all duration-500 ${
-                selectedFriend.is_online ? 'ring-online/30' : 'ring-white/[0.06]'
+                selectedFriend?.is_online ? 'ring-online/30' : 'ring-white/[0.06]'
               }`}>
-                  {selectedFriend.avatar_url ? (
+                  {selectedFriend?.avatar_url ? (
                     <img 
                       src={selectedFriend.avatar_url.startsWith("http") ? selectedFriend.avatar_url : `${SOCKET_URL}${selectedFriend.avatar_url}`} 
                       alt="" 
                       className="w-full h-full object-cover" 
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).parentElement?.insertAdjacentHTML('beforeend', `<span class="flex items-center justify-center w-full h-full bg-primary/10 text-primary font-bold text-sm">${selectedFriend.username?.charAt(0).toUpperCase() || '?'}</span>`);
+                        (e.target as HTMLImageElement).parentElement?.insertAdjacentHTML('beforeend', `<span class="flex items-center justify-center w-full h-full bg-primary/10 text-primary font-bold text-sm">${selectedFriend?.username?.charAt(0)?.toUpperCase() || '?'}</span>`);
                       }}
                     />
                   ) : (
-                    <span className="text-primary font-bold text-sm">{selectedFriend.username?.charAt(0).toUpperCase() || '?'}</span>
+                    <span className="text-primary font-bold text-sm">{selectedFriend?.username?.charAt(0)?.toUpperCase() || '?'}</span>
                   )}
               </div>
             )}
-            {selectedFriend.cv_id !== 'Group' && (
+            {selectedFriend?.cv_id !== 'Group' && (
               <span
                 className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background transition-colors duration-300 ${
-                  selectedFriend.is_online ? "bg-online" : "bg-offline"
+                  selectedFriend?.is_online ? "bg-online" : "bg-offline"
                 }`}
               />
             )}
           </div>
           <div className="text-left">
-            <p className="font-semibold text-foreground text-[15px]">{selectedFriend.username}</p>
+            <p className="font-semibold text-foreground text-[15px]">{selectedFriend?.username}</p>
             <p className={`text-xs transition-colors duration-300 ${isTyping ? 'text-primary font-medium' : 'text-muted-foreground/60'}`}>
-              {selectedFriend.cv_id === 'Group'
+              {selectedFriend?.cv_id === 'Group'
                 ? `Group Chat • Click to manage`
-                : (isTyping ? "typing..." : (chatMode === "wifi" ? `Mesh Network` : (selectedFriend.is_online ? "Online" : "Offline")))
+                : (isTyping ? "typing..." : (chatMode === "wifi" ? `Mesh Network` : (selectedFriend?.is_online ? "Online" : "Offline")))
               }
             </p>
           </div>
@@ -571,7 +589,7 @@ const ChatArea = ({
           </button>
           
           {/* Only show call buttons for direct friend chats */}
-          {selectedFriend.cv_id !== 'Group' && (
+          {selectedFriend?.cv_id !== 'Group' && (
             <>
               <button
                 onClick={() => onStartCall("audio")}
@@ -591,7 +609,7 @@ const ChatArea = ({
             </>
           )}
 
-          {onSetChatMode && selectedFriend.cv_id !== 'Group' && (
+          {onSetChatMode && selectedFriend?.cv_id !== 'Group' && (
             <button
               onClick={() => onSetChatMode(chatMode === "internet" ? "wifi" : "internet")}
               className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 border ${
@@ -742,10 +760,10 @@ const ChatArea = ({
         )}
         {/* Messages Container */}
         <div className="flex-1 overflow-hidden relative">
-          <div className="h-full flex flex-col max-w-4xl mx-auto w-full px-4 md:px-9">
+          <div className="h-full flex flex-col w-full">
             <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin py-6 flex flex-col scroll-smooth">
               <div className="flex-1" />
-              <div className="space-y-6">
+              <div className="max-w-4xl mx-auto w-full px-4 md:px-9 space-y-6">
                 {filteredMessages.map((msg) => (
                   <MessageBubble 
                     key={msg._id} 
@@ -759,12 +777,15 @@ const ChatArea = ({
                     onForward={() => onForwardMessage(msg)}
                     onStartCall={onStartCall}
                     currentUserId={currentUserId}
+                    onScrollToRepliedMessage={handleScrollToRepliedMessage}
+                    isHighlighted={highlightedMessageId === msg._id}
                   />
                 ))}
+                
                 {/* Typing Indicators */}
                 {/* Group typing: premium floating styling */}
                 {groupTypingUsers.length > 0 && (
-                  <div className="flex items-center gap-2 animate-fade-in py-2 pl-2">
+                  <div className="flex items-center gap-2 animate-fade-in py-2">
                     <div className="flex px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-full items-center shadow-lg backdrop-blur-md">
                       <div className="flex -space-x-2 mr-3">
                         {groupTypingUsers.slice(0, 4).map((u, i) => (
@@ -783,7 +804,7 @@ const ChatArea = ({
                                 />
                               ) : (
                                 <span className="text-[10px] font-black text-primary">
-                                  {u.username.charAt(0).toUpperCase()}
+                                  {u.username?.charAt(0)?.toUpperCase() || '?'}
                                 </span>
                               )}
                             </div>
@@ -798,6 +819,7 @@ const ChatArea = ({
                     </div>
                   </div>
                 )}
+
                 {/* 1-on-1 typing */}
                 {isTyping && (
                   <div className="flex flex-col gap-2 animate-fade-in py-2">
@@ -808,8 +830,8 @@ const ChatArea = ({
                     </div>
                   </div>
                 )}
-                <div ref={messagesEndRef} />
               </div>
+              <div ref={messagesEndRef} />
             </div>
           </div>
         </div>

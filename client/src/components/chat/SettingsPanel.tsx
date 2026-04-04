@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { 
   X, Save, Upload, Camera, Lock, Trash2, Key, Moon, Sun, 
   Volume2, Eye, EyeOff, ChevronDown, Settings, Loader2, Sparkles, 
-  User, ShieldCheck, Ban, Info
+  User, ShieldCheck, Ban, Info, MessageSquare, Mail
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SOCKET_URL } from "@/lib/config";
@@ -31,12 +31,12 @@ interface SettingsPanelProps {
 }
 
 const SettingsPanel = ({
-  username: initialUsername,
-  bio: initialBio,
-  avatarUrl: initialAvatar,
-  cvId,
-  email,
-  userId,
+  username: initialUsername = "",
+  bio: initialBio = "",
+  avatarUrl: initialAvatar = "",
+  cvId = "",
+  email = "",
+  userId = "",
   onSave,
   onUpdateSettings,
   onFriendAdded,
@@ -47,9 +47,9 @@ const SettingsPanel = ({
   onLockNow,
   onClose,
 }: SettingsPanelProps) => {
-  const [username, setUsername] = useState(initialUsername);
-  const [bio, setBio] = useState(initialBio);
-  const [avatarUrl, setAvatarUrl] = useState(initialAvatar);
+  const [username, setUsername] = useState(initialUsername || "");
+  const [bio, setBio] = useState(initialBio || "");
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatar || "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
@@ -69,12 +69,13 @@ const SettingsPanel = ({
   }, [showSection]);
 
   const fetchBlockedUsers = async () => {
+    if (!userId) return;
     setLoadingBlocked(true);
     try {
       const resp = await fetch(`${SOCKET_URL}/api/auth/blocked/${userId}`);
       if (resp.ok) {
         const data = await resp.json();
-        setBlockedUsers(data);
+        setBlockedUsers(Array.isArray(data) ? data : []);
       }
     } catch (e) {
       console.error("Failed to fetch blocked users:", e);
@@ -83,6 +84,7 @@ const SettingsPanel = ({
   };
 
   const handleUnblock = async (targetId: string) => {
+    if (!userId || !targetId) return;
     try {
       const resp = await fetch(`${SOCKET_URL}/api/auth/unblock`, {
         method: "POST",
@@ -130,7 +132,11 @@ const SettingsPanel = ({
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave({ username, bio, avatar_url: avatarUrl });
+    try {
+      await onSave({ username, bio, avatar_url: avatarUrl });
+    } catch (e) {
+      console.error("Save failure", e);
+    }
     setSaving(false);
   };
 
@@ -149,7 +155,7 @@ const SettingsPanel = ({
         setNewPassword("");
       } else {
         const error = await resp.json();
-        alert(error.message || "Failed to update password");
+        console.warn(error.message || "Failed to update password");
       }
     } catch (e) {
       console.error(e);
@@ -158,7 +164,7 @@ const SettingsPanel = ({
   };
 
   const handleSetPin = async () => {
-    if (newPin.length !== 4) return;
+    if ((newPin || "").length !== 4) return;
     setPassSaving(true);
     const success = await onSetPin(newPin);
     if (success) {
@@ -183,15 +189,15 @@ const SettingsPanel = ({
   };
 
   const hasChanges =
-    username !== initialUsername ||
-    bio !== initialBio ||
-    avatarUrl !== initialAvatar;
+    username !== (initialUsername || "") ||
+    bio !== (initialBio || "") ||
+    avatarUrl !== (initialAvatar || "");
 
   const sections = [
-    { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'preferences', label: 'App Settings', icon: Settings },
-    { id: 'security', label: 'Security', icon: ShieldCheck },
-    { id: 'blocked', label: 'Blocked', icon: Ban },
+    { id: "profile", label: "My Profile", icon: User },
+    { id: "preferences", label: "App Settings", icon: Settings },
+    { id: "security", label: "Security", icon: ShieldCheck },
+    { id: "blocked", label: "Blocked", icon: Ban },
   ];
 
   const Toggle = ({ enabled, onClick }: { enabled: boolean; onClick: () => void }) => (
@@ -267,7 +273,7 @@ const SettingsPanel = ({
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-gradient-to-br from-transparent to-primary/[0.02]">
           <div className="flex-1 overflow-y-auto scrollbar-thin p-6 md:p-10">
             <AnimatePresence mode="wait">
-              {showSection === 'profile' && (
+              {showSection === "profile" && (
                 <motion.div 
                   key="profile"
                   initial={{ opacity: 0, x: 20 }}
@@ -285,7 +291,7 @@ const SettingsPanel = ({
                             {avatarUrl ? (
                               <img src={getAvatarSrc()} alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                             ) : (
-                              <span className="text-5xl font-black text-primary/40 leading-none">{username[0]?.toUpperCase()}</span>
+                              <span className="text-5xl font-black text-primary/40 leading-none">{(username || " ").charAt(0).toUpperCase() || "?"}</span>
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                                <Upload className="w-8 h-8 text-white" />
@@ -302,14 +308,14 @@ const SettingsPanel = ({
 
                     <div className="flex-1 space-y-4">
                        <div className="space-y-1">
-                          <h3 className="text-2xl font-black tracking-tight">{username}</h3>
+                          <h3 className="text-2xl font-black tracking-tight">{username || "Anonymous User"}</h3>
                           <div className="flex items-center gap-2">
                              <div className="px-3 py-1 rounded-full bg-white/[0.05] border border-white/5 flex items-center gap-2">
                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 online-pulse" />
                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Online Profile</span>
                              </div>
                              <div className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-                               <span className="text-[10px] font-mono font-bold text-primary hover:text-[12px] transition-all duration-300 cursor-default">{cvId}</span>
+                               <span className="text-[10px] font-mono font-bold text-primary hover:text-[12px] transition-all duration-300 cursor-default">{cvId || "No ID"}</span>
                              </div>
                           </div>
                        </div>
@@ -336,10 +342,10 @@ const SettingsPanel = ({
                     <div className="space-y-3">
                        <label className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] ml-1">Member Email</label>
                        <div className="relative opacity-60">
-                          <EyeOff className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <input
                             type="text"
-                            value={email}
+                            value={email || ""}
                             disabled
                             className="w-full pl-12 pr-4 py-4 rounded-3xl bg-white/[0.02] border border-white/5 text-xs font-medium cursor-not-allowed"
                           />
@@ -347,30 +353,35 @@ const SettingsPanel = ({
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] ml-1">My Bio Narrative</label>
-                    <textarea
-                      value={bio}
-                      onChange={(e) => setBio(e.target.value)}
-                      maxLength={150}
-                      rows={4}
-                      placeholder="Share a thought..."
-                      className="w-full px-6 py-5 rounded-[2rem] bg-white/[0.03] border border-white/5 text-sm leading-relaxed focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all hover:bg-white/[0.05] resize-none font-medium"
-                    />
-                    <div className="flex justify-between items-center px-4">
-                      <div className="flex items-center gap-2 opacity-40">
-                         <Info className="w-3 h-3" />
-                         <span className="text-[10px] font-medium italic">Supports plain text narrative.</span>
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.3em] flex items-center gap-2 ml-1">
+                      <MessageSquare className="w-3 h-3 text-primary/60" />
+                      My Bio Narrative
+                    </label>
+                    <div className="relative group">
+                      <textarea
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        maxLength={150}
+                        rows={4}
+                        placeholder="Share a thought..."
+                        className="w-full px-8 py-6 rounded-[2.5rem] bg-white/[0.03] border border-white/5 text-sm leading-relaxed focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all hover:bg-white/[0.05] resize-none font-medium placeholder:text-muted-foreground/20 min-h-[100px]"
+                      />
+                      <div className="absolute bottom-6 right-8 flex items-center gap-4">
+                        <span className={`text-[10px] font-black tracking-widest tabular-nums ${(bio || "").length >= 140 ? "text-destructive" : "text-primary/40 group-focus-within:text-primary transition-colors"}`}>
+                          {(bio || "").length} <span className="opacity-20">/</span> 150
+                        </span>
                       </div>
-                      <span className={`text-[10px] font-black tracking-widest ${bio.length >= 140 ? "text-destructive" : "text-primary opacity-60"}`}>
-                        {bio.length} <span className="opacity-40">/</span> 150
-                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 px-6 py-1.5 rounded-full bg-white/[0.02] border border-white/[0.03] w-fit">
+                       <Info className="w-3 h-3 text-primary/40" />
+                       <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">Profile changes are updated in real-time.</span>
                     </div>
                   </div>
                 </motion.div>
               )}
 
-              {showSection === 'preferences' && (
+              {showSection === "preferences" && (
                 <motion.div 
                   key="preferences"
                   initial={{ opacity: 0, x: 20 }}
@@ -387,11 +398,11 @@ const SettingsPanel = ({
 
                    <div className="space-y-4">
                     {[
-                      { id: 'theme', icon: settings.theme === 'dark' ? Moon : Sun, label: 'Night Protocol (Dark Mode)', desc: 'Toggles high-contrast dark theme optimized for low light.', val: settings.theme === 'dark', action: () => onUpdateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' }) },
-                      { id: 'sounds', icon: Volume2, label: 'Tactile Sound Feedback', desc: 'Audible confirmations for messages and system triggers.', val: settings.sounds_enabled, action: () => onUpdateSettings({ sounds_enabled: !settings.sounds_enabled }) },
-                      { id: 'receipts', icon: Eye, label: 'Telemetry (Read Receipts)', desc: 'Transmit transmission status to conversation peers.', val: settings.show_read_receipts, action: () => onUpdateSettings({ show_read_receipts: !settings.show_read_receipts }) },
+                      { id: "theme", icon: settings?.theme === "dark" ? Moon : Sun, label: "Night Protocol (Dark Mode)", desc: "Toggles high-contrast dark theme optimized for low light.", val: settings?.theme === "dark", action: () => onUpdateSettings({ theme: settings?.theme === "dark" ? "light" : "dark" }) },
+                      { id: "sounds", icon: Volume2, label: "Tactile Sound Feedback", desc: "Audible confirmations for messages and system triggers.", val: settings?.sounds_enabled, action: () => onUpdateSettings({ sounds_enabled: !settings?.sounds_enabled }) },
+                      { id: "receipts", icon: Eye, label: "Telemetry (Read Receipts)", desc: "Transmit transmission status to conversation peers.", val: settings?.show_read_receipts, action: () => onUpdateSettings({ show_read_receipts: !settings?.show_read_receipts }) },
                     ].map((pref) => (
-                      <div key={pref.id} className="group flex items-center justify-between p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-300">
+                      <div key={pref.id} className="group flex items-center justify-between p-6 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all duration-300">
                         <div className="flex items-center gap-6">
                           <div className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-muted-foreground group-hover:text-primary transition-all group-hover:gradient-primary group-hover:text-white group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/20">
                             <pref.icon className="w-6 h-6" />
@@ -418,7 +429,7 @@ const SettingsPanel = ({
                 </motion.div>
               )}
 
-              {showSection === 'security' && (
+              {showSection === "security" && (
                 <motion.div 
                   key="security"
                   initial={{ opacity: 0, x: 20 }}
@@ -474,7 +485,7 @@ const SettingsPanel = ({
                           <p className="text-xs text-muted-foreground tracking-wide font-medium">Protect your holographic terminal with a 4-digit security PIN.</p>
                        </div>
 
-                       <div className="group flex items-center justify-between p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all duration-300">
+                       <div className="group flex items-center justify-between p-6 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all duration-300">
                           <div className="flex items-center gap-6">
                              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                                 <ShieldCheck className="w-6 h-6" />
@@ -524,7 +535,7 @@ const SettingsPanel = ({
                                     />
                                     <button 
                                       onClick={handleSetPin}
-                                      disabled={newPin.length !== 4 || passSaving}
+                                      disabled={(newPin || "").length !== 4 || passSaving}
                                       className="h-14 px-8 rounded-2xl gradient-primary text-[10px] font-black tracking-widest uppercase disabled:opacity-20"
                                     >
                                       {passSaving ? "Saving..." : "Save PIN"}
@@ -552,7 +563,7 @@ const SettingsPanel = ({
                 </motion.div>
               )}
 
-              {showSection === 'blocked' && (
+              {showSection === "blocked" && (
                 <motion.div 
                   key="blocked"
                   initial={{ opacity: 0, x: 20 }}
@@ -590,7 +601,7 @@ const SettingsPanel = ({
                                       {u.avatar_url ? (
                                         <img src={`${SOCKET_URL}${u.avatar_url}`} className="w-full h-full object-cover" />
                                       ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-primary/20 font-black text-xs">{u.username[0]}</div>
+                                        <div className="w-full h-full flex items-center justify-center bg-primary/20 font-black text-xs">{(u?.username || " ").charAt(0).toUpperCase() || "?"}</div>
                                       )}
                                    </div>
                                    <div>
@@ -615,15 +626,18 @@ const SettingsPanel = ({
           </div>
 
           {/* Action Hub */}
-          <div className="p-10 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
-             <div className="hidden md:block">
-               <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">System Cloud Sync Active</span>
+          <div className="px-10 py-8 bg-black/40 border-t border-white/[0.05] flex flex-col sm:flex-row items-center justify-between gap-6">
+             <div className="hidden sm:block">
+               <div className="flex items-center gap-3">
+                 <div className="relative">
+                   <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse-glow" />
+                   <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-primary animate-ping opacity-40" />
+                 </div>
+                 <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] whitespace-nowrap">Holographic Sync Active</span>
                </div>
              </div>
              
-             <div className="flex gap-4 w-full md:w-auto">
+             <div className="flex gap-4 w-full sm:w-auto">
                <button
                  onClick={() => {
                    setUsername(initialUsername);
@@ -631,16 +645,16 @@ const SettingsPanel = ({
                    setAvatarUrl(initialAvatar);
                  }}
                  disabled={!hasChanges}
-                 className="flex-1 md:flex-none px-8 py-4 rounded-2xl bg-white/[0.03] border border-white/5 text-[10px] font-black tracking-[0.2em] text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all disabled:opacity-30 uppercase"
+                 className="flex-1 sm:flex-none px-8 py-4 rounded-2xl bg-white/[0.02] border border-white/5 text-[10px] font-black tracking-[0.2em] text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.05] transition-all disabled:opacity-20 disabled:cursor-not-allowed uppercase"
                >
                  Revert Changes
                </button>
                <button
                  onClick={handleSave}
                  disabled={!hasChanges || saving}
-                 className="flex-1 md:flex-none px-10 py-4 rounded-2xl gradient-primary shadow-xl shadow-primary/20 text-[10px] font-black tracking-[0.2em] text-white hover:scale-[1.05] active:scale-[0.95] transition-all disabled:opacity-30 uppercase flex items-center gap-2"
+                 className="flex-1 sm:flex-none px-10 py-4 rounded-2xl gradient-primary shadow-xl shadow-primary/20 text-[10px] font-black tracking-[0.2em] text-white hover:scale-[1.05] active:scale-[0.95] transition-all disabled:opacity-30 uppercase flex items-center justify-center gap-3"
                >
-                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                 {saving ? <Loader2 className="w-4 h-4 animate-spin text-white/80" /> : <Save className="w-4 h-4 text-white/80" />}
                  {saving ? "SYNCING..." : "COMMIT CHANGES"}
                </button>
              </div>
@@ -659,4 +673,3 @@ const SettingsPanel = ({
 };
 
 export default SettingsPanel;
-

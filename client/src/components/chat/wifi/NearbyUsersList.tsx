@@ -22,15 +22,18 @@ const NearbyUsersList = ({
   outgoingP2PRequests
 }: NearbyUsersListProps) => {
   return (
-    <div className="space-y-5 flex flex-col h-full bg-white/[0.02] border border-white/[0.04] p-5 rounded-2xl shadow-sm">
-      <div className="flex items-center justify-between border-b border-white/[0.05] pb-4">
-        <h3 className="text-sm font-bold text-foreground/80 uppercase tracking-widest flex items-center gap-2">
-          <UserPlus className="w-4 h-4 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.2)]" />
-          Nearby Users
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between py-4 px-2 border-b border-primary/10 mb-4">
+        <h3 className="text-[11px] font-black text-white uppercase tracking-[0.25em] flex items-center gap-3">
+          <UserPlus className="w-4 h-4 text-primary" />
+          Nearby Nodes
         </h3>
-        <span className="text-[10px] bg-primary/10 text-primary px-2.5 py-1 rounded-full font-black border border-primary/20 shadow-sm shadow-primary/5">
-          {nearbyUsers.length} FOUND
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-online animate-pulse" />
+          <span className="text-[10px] font-black text-primary/80 uppercase tracking-widest">
+            {nearbyUsers.length} Found
+          </span>
+        </div>
       </div>
       
       <div className="flex-1 space-y-3 overflow-y-auto scrollbar-thin px-0.5">
@@ -128,13 +131,13 @@ const NearbyUsersList = ({
                     )}
                     <button 
                       onClick={() => onConnect(u.userId)}
-                      disabled={outgoingP2PRequests.has(u.userId)}
-                      className={`h-10 px-6 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95 shadow-xl ${
+                      disabled={outgoingP2PRequests.has(u.userId) || isConnected}
+                      className={`h-10 px-6 rounded-2xl text-[10px] font-black tracking-widest transition-all shadow-xl ${
                         isConnected 
-                        ? "bg-transparent text-primary border border-primary/30 backdrop-blur-md" 
+                        ? "bg-primary/20 text-primary border border-primary/30 backdrop-blur-md cursor-default" 
                         : outgoingP2PRequests.has(u.userId)
                         ? "bg-white/[0.05] text-white/20 border border-white/5 cursor-not-allowed"
-                        : "gradient-primary text-primary-foreground shadow-primary/20 hover:brightness-110 glow-button"
+                        : "gradient-primary text-primary-foreground shadow-primary/20 hover:brightness-110 glow-button active:scale-95"
                       }`}
                     >
                       {isConnected ? "ACTIVE" : outgoingP2PRequests.has(u.userId) ? "SENT" : "JOIN"}

@@ -9,6 +9,8 @@ import SettingsPanel from "./SettingsPanel";
 import ConfirmDialog from "./ConfirmDialog";
 import WifiSidebarItem from "./wifi/WifiSidebarItem";
 import LogoutButton from "./LogoutButton";
+import CreateGroupModal from "./CreateGroupModal";
+import { MessageSquare } from "lucide-react";
 
 import { SOCKET_URL } from "@/lib/config";
 
@@ -44,6 +46,7 @@ interface ChatSidebarProps {
   onSelectRoom: (room: any) => void;
   selectedRoom: any | null;
   onHomeClick: () => void;
+  onCreateGroup: (name: string, MemberIds: string[]) => void;
 }
 
 const ChatSidebar = ({
@@ -78,6 +81,7 @@ const ChatSidebar = ({
   onSelectRoom,
   selectedRoom,
   onHomeClick,
+  onCreateGroup,
 }: ChatSidebarProps) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newFriendName, setNewFriendName] = useState("");
@@ -86,6 +90,7 @@ const ChatSidebar = ({
   const [confirmAction, setConfirmAction] = useState<{ type: 'unfriend' | 'block'; friendId: string; friendName: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
 
   const filteredFriends = friends.filter(f =>
     f.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -246,7 +251,7 @@ const ChatSidebar = ({
                                 className="w-full h-full object-cover" 
                               />
                             ) : (
-                              <span className="text-primary font-bold text-sm">{friend.username.charAt(0).toUpperCase()}</span>
+                              <span className="text-primary font-bold text-sm">{friend.username?.charAt(0)?.toUpperCase() || '?'}</span>
                             )}
                           </div>
                           <span
@@ -296,6 +301,19 @@ const ChatSidebar = ({
               </>
             ) : activeTab === 'groups' ? (
               <div className="space-y-4 animate-fade-in">
+                {/* Create Group Action */}
+                <div className="px-2 mb-2">
+                   <button
+                     onClick={() => setShowCreateGroup(true)}
+                     className="w-full py-3.5 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center gap-3 group hover:bg-primary/20 transition-all duration-300"
+                   >
+                     <div className="w-8 h-8 rounded-xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
+                       <PlusCircle className="w-4 h-4 text-white" />
+                     </div>
+                     <span className="text-[10px] font-black uppercase tracking-widest text-primary">Initiate New Group</span>
+                   </button>
+                </div>
+
                 {/* Joined Groups Section */}
                 {joinedRooms.length > 0 && (
                   <div className="space-y-1">
@@ -335,7 +353,7 @@ const ChatSidebar = ({
                                           <img src={avatarUrl.startsWith('http') ? avatarUrl : `${SOCKET_URL}${avatarUrl}`} alt="" className="w-full h-full object-cover" />
                                         ) : (
                                           <div className="w-full h-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary">
-                                            {uname.charAt(0).toUpperCase()}
+                                            {uname?.charAt(0)?.toUpperCase() || '?'}
                                           </div>
                                         )}
                                       </div>
@@ -348,7 +366,7 @@ const ChatSidebar = ({
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-primary font-black text-lg">{room.roomName?.charAt(0).toUpperCase()}</span>
+                                <span className="text-primary font-black text-lg">{room.roomName?.charAt(0)?.toUpperCase() || '?'}</span>
                               )}
                             </div>
                             <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-online border-2 border-background flex items-center justify-center">
@@ -448,7 +466,7 @@ const ChatSidebar = ({
                                   }}
                                 />
                               ) : (
-                                req.sender.username.charAt(0).toUpperCase()
+                                req.sender?.username?.charAt(0)?.toUpperCase() || '?'
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -489,15 +507,15 @@ const ChatSidebar = ({
                     {avatarUrl ? (
                       <img src={avatarUrl.startsWith("http") ? avatarUrl : `${SOCKET_URL}${avatarUrl}`} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      username[0]?.toUpperCase()
+                      username?.charAt(0)?.toUpperCase() || '?'
                     )}
                   </div>
                   <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-online border-[2px] border-background online-pulse" />
                 </div>
                 <div className="flex-1 min-w-0 leading-tight">
-                  <p className="text-xs font-semibold text-foreground truncate">{username}</p>
+                  <p className="text-xs font-semibold text-foreground truncate">{username || 'Anonymous User'}</p>
                   <p className="text-[9px] text-muted-foreground font-mono bg-secondary/40 px-1.5 py-0.5 rounded border border-white/[0.1] mt-0.5 inline-block truncate max-w-full hover:text-[11px] transition-all duration-300 cursor-default">
-                    {cvId}
+                    {cvId || 'No CV-ID'}
                   </p>
                 </div>
               </div>
@@ -532,6 +550,19 @@ const ChatSidebar = ({
             onSetPin={onSetPin}
             onLockNow={onLockNow}
             onClose={() => setShowSettings(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showCreateGroup && (
+          <CreateGroupModal
+            friends={friends}
+            onClose={() => setShowCreateGroup(false)}
+            onCreate={async (name, MemberIds) => {
+              await onCreateGroup(name, MemberIds);
+              setShowCreateGroup(false);
+            }}
           />
         )}
       </AnimatePresence>
