@@ -193,7 +193,7 @@ const ChatArea = ({
             transition={{ duration: 1, ease: "easeOut" }}
             className="relative mb-8 pt-4"
           >
-            <div className="absolute inset-0 flex items- center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-64 h-64 rounded-full bg-primary/20 blur-[100px] animate-pulse" />
             </div>
             
@@ -202,7 +202,8 @@ const ChatArea = ({
                 <img 
                   src="/full-logo.png" 
                   alt="ezchat" 
-                  className="w-full h-full object-contain relative z-20 brand-logo drop-shadow-[0_0_35px_rgba(59,130,246,0.2)] transition-transform hover:scale-110 duration-700"
+                  className="w-full h-full object-contain relative z-20 brand-logo drop-shadow-[0_0_45px_rgba(59,130,246,0.2)] transition-transform hover:scale-110 duration-700"
+                  style={{ mixBlendMode: 'screen' }} 
                 />
               </div>
             </div>

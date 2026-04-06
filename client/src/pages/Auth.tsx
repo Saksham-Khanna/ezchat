@@ -93,6 +93,7 @@ const Auth = () => {
                 src="/full-logo.png" 
                 alt="ezchat Logo" 
                 className="h-full object-contain drop-shadow-2xl" 
+                style={{ mixBlendMode: 'screen' }} 
               />
             </div>
           </div>

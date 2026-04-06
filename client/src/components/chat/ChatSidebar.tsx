@@ -114,17 +114,18 @@ const ChatSidebar = ({
           <div className="flex items-center justify-between mb-5">
             <div 
               onClick={onHomeClick}
-              className="flex items-center gap-3 select-none group cursor-pointer"
+              className="flex items-center gap-2 select-none group cursor-pointer"
             >
-              <div className="relative w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl">
-                <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              <div className="relative w-11 h-11 flex items-center justify-center overflow-hidden rounded-xl bg-primary/[0.05] transition-all duration-500 shadow-[0_0_20px_rgba(59,130,246,0.05)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.15)] group-hover:bg-primary/[0.1]">
+                <div className="absolute inset-0 bg-primary/10 blur-xl rounded-full opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
                 <img 
                   src="/logo.png" 
                   alt="Logo" 
-                  className="w-full h-full object-contain relative z-10 scale-[3.2] translate-y-[10px]" 
+                  className="w-full h-full object-contain relative z-10 scale-[3] translate-y-[8px] drop-shadow-glow" 
+                  style={{ mixBlendMode: 'screen' }} 
                 />
               </div>
-              <span className="font-black text-3xl tracking-tight gradient-text drop-shadow-sm leading-none">ezchat</span>
+              <span className="font-semibold text-[30px] tracking-tight gradient-text drop-shadow-[0_0_15px_rgba(59,130,246,0.2)] leading-none select-none">ezchat</span>
             </div>
             <div className="flex items-center gap-2">
               <LogoutButton onLogout={onLogout} />
@@ -204,26 +205,51 @@ const ChatSidebar = ({
                 </div>
 
                 {friends.length === 0 ? (
-                  <div className="text-center py-12 px-4 animate-fade-in">
-                    <div className="relative w-28 h-28 mb-5 mx-auto flex items-center justify-center overflow-hidden rounded-2xl">
-                      <div className="absolute inset-0 bg-primary/15 blur-2xl rounded-full animate-pulse" />
-                      <div className="absolute inset-0 bg-accent/10 blur-2xl rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
-                      <img 
-                        src="/full-logo.png" 
-                        alt="" 
-                        className="w-full h-full object-contain relative opacity-40 hover:opacity-100 transition-opacity duration-700 brand-logo logo-float" 
-                        style={{ mixBlendMode: 'screen' }} 
+                  <div className="text-center py-2 px-4 animate-fade-in overflow-hidden">
+                    {/* Radar Container - Fixed width/height to prevent text shift */}
+                    <div className="relative w-28 h-28 mb-1 mx-auto flex items-center justify-center">
+                      {/* Scanning Rings (Pings) - More visible border */}
+                      <div className="absolute inset-0 rounded-full border-2 border-primary/30 scale-[0.6] opacity-0" style={{ animation: 'radar-ping 4s cubic-bezier(0, 0, 0.2, 1) infinite' }} />
+                      
+                      {/* Fixed Grid Rings - Stronger grid */}
+                      <div className="absolute inset-2 rounded-full border border-white/[0.08] shadow-[inset_0_0_20px_rgba(59,130,246,0.03)]" />
+                      <div className="absolute inset-8 rounded-full border border-white/[0.05]" />
+
+                      {/* Rotating Scanning Beam - Higher opacity */}
+                      <div 
+                        className="absolute inset-0 rounded-full opacity-40"
+                        style={{ 
+                          background: 'conic-gradient(from 0deg, transparent 0%, rgba(59, 130, 246, 0.5) 15%, transparent 20%)',
+                          animation: 'radar-sweep 4s linear infinite'
+                        }} 
                       />
+
+                      {/* Central Anchor Node (The 'e' Swirl) - Perfectly centered and bold */}
+                      <div className="relative z-10 w-12 h-12 rounded-xl bg-primary/15 backdrop-blur-md border border-primary/30 flex items-center justify-center shadow-[0_0_25px_rgba(59,130,246,0.25)] group/node transition-all duration-500 hover:scale-110">
+                        <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full animate-pulse-glow" />
+                        <img 
+                          src="/logo.png" 
+                          alt="" 
+                          className="w-8 h-8 object-contain relative z-10 scale-[2.8] translate-y-1 drop-shadow-glow brightness-125" 
+                          style={{ mixBlendMode: 'screen' }} 
+                        />
+                      </div>
                     </div>
-                    <p className="text-sm font-medium text-muted-foreground/80 mb-1">No conversations yet</p>
-                    <p className="text-xs text-muted-foreground/50 mb-5">Add friends to start chatting</p>
-                    <button
-                      onClick={() => setActiveTab('requests')}
-                      className="text-xs font-bold gradient-text hover:opacity-80 transition-opacity inline-flex items-center gap-1.5"
-                    >
-                      <Sparkles className="w-3 h-3" style={{ WebkitTextFillColor: 'unset', color: 'hsl(200 80% 45%)' }} />
-                      Send your first friend request
-                    </button>
+
+                    <div className="space-y-0 relative z-10">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary animate-pulse">Scanning Mesh</p>
+                      <p className="text-[8px] font-medium text-muted-foreground/40 italic leading-none">Establishing peer links</p>
+                    </div>
+                    
+                    <div className="mt-4 animate-fade-in-up transition-all" style={{ animationDelay: '0.4s' }}>
+                      <button
+                        onClick={() => setActiveTab('requests')}
+                        className="text-[9px] font-black uppercase tracking-widest gradient-text hover:opacity-80 transition-opacity inline-flex items-center gap-1.5 group/btn"
+                      >
+                        <Sparkles className="w-3 h-3" style={{ WebkitTextFillColor: 'unset', color: 'hsl(200 80% 45%)' }} />
+                        Initiate Discovery
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   filteredFriends.map((friend, index) => (

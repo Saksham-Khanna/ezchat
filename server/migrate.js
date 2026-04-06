@@ -1,7 +1,8 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 
-const oldUri = 'mongodb+srv://sakshamm:mypass123@cluster0.rngathm.mongodb.net/test?appName=Cluster0';
-const newUri = 'mongodb+srv://sakshamm:mypass123@cluster0.rngathm.mongodb.net/ezchat-db?appName=Cluster0';
+const oldUri = process.env.OLD_MONGODB_URI || 'mongodb://localhost:27017/test';
+const newUri = process.env.MONGODB_URI;
 
 async function migrate() {
     try {
