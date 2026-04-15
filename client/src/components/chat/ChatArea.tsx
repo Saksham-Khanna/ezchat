@@ -140,7 +140,9 @@ const ChatArea = ({
     "Secure End-to-End Encryption",
     "High-Quality Voice & Video Calls",
     "Instant File & Image Sharing",
-    "Dynamic Profile Customization"
+    "Dynamic Profile Customization",
+    "AI-Powered Smart Replies",
+    "Contextual Conversations"
   ];
 
   // Reply Navigation & Highlight State

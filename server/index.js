@@ -52,11 +52,13 @@ app.get('/', (req, res) => {
 const authRoutes = require('./routes/auth');
 const messageRoutes = require('./routes/messages');
 const groupRoutes = require('./routes/groups');
+const aiRoutes = require('./routes/ai');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/ai', aiRoutes);
 
 const http = require('http');
 const { Server } = require('socket.io');
@@ -84,7 +86,7 @@ const getNetworkId = (socket) => {
 };
 
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+  // Connection logged without exposing socket ID
 
   socket.on('heartbeat', async (userId) => {
     if (userId) {
@@ -100,7 +102,7 @@ io.on('connection', (socket) => {
     if (userId) {
       socket.join(userId.toString());
       userSocketMap.set(socket.id, userId.toString());
-      console.log(`User ${userId} joined their room: ${userId}`);
+      // User joined their room
 
       // Mark user as online in DB
       try {
@@ -108,7 +110,7 @@ io.on('connection', (socket) => {
         const user = await User.findByIdAndUpdate(userId, { 
           is_online: true,
           last_seen: new Date()
-        }, { new: true })
+        }, { returnDocument: 'after' })
           .populate('friends', '_id');
         if (user && user.friends) {
           // Notify all friends that this user is now online
@@ -128,7 +130,6 @@ io.on('connection', (socket) => {
         const userGroups = await Group.find({ 'members.userId': userId });
         userGroups.forEach(group => {
           socket.join(group.room_id);
-          console.log(`User ${userId} auto-joined group room: ${group.room_id}`);
         });
       } catch (err) {
         console.error('Error auto-joining groups:', err);
@@ -143,15 +144,14 @@ io.on('connection', (socket) => {
     const sender_id = data.sender_id?.toString();
     const recipient_id = data.recipient_id?.toString();
     
-    console.log(`Message from ${sender_id} to ${recipient_id}: ${data.content?.substring(0, 20)}...`);
+    // Message relayed (content not logged for privacy)
     
     if (recipient_id) {
       // Ensure we emit stringified IDs
       const emitData = { ...data, sender_id, recipient_id };
       io.to(recipient_id).emit('receive_message', emitData);
-      console.log(`Emitted receive_message to room: ${recipient_id}`);
     } else {
-      console.error('send_message failed: recipient_id is missing', data);
+      console.error('send_message failed: recipient_id is missing');
     }
   });
 
@@ -183,7 +183,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', async () => {
     const userId = userSocketMap.get(socket.id);
     userSocketMap.delete(socket.id);
-    console.log(`User ${userId || 'unknown'} disconnected (Socket: ${socket.id}). Remaining sockets: ${userSocketMap.size}`);
+    // User disconnected
 
     if (userId) {
       // Check if user has any other active sockets (multiple tabs)
@@ -220,7 +220,7 @@ io.on('connection', (socket) => {
           const user = await User.findByIdAndUpdate(userId, { 
             is_online: false,
             last_seen: new Date() 
-          }, { new: true })
+          }, { returnDocument: 'after' })
             .populate('friends', '_id');
           
           if (user && user.friends) {

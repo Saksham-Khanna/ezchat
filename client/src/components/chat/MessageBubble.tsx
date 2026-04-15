@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import type { Message } from "@/pages/Dashboard";
-import { Clock, Check, Download, Trash2, Reply, Pencil, Smile, Share2, Phone, Video, Lock as LockIcon, Image as ImageIcon, FileText } from "lucide-react";
+import { Clock, Check, Download, Trash2, Reply, Pencil, Smile, Share2, Phone, Video, Lock as LockIcon, Image as ImageIcon, FileText, Languages } from "lucide-react";
 import VoicePlayer from "./VoicePlayer";
 import { SOCKET_URL } from "@/lib/config";
 
@@ -56,6 +56,63 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
   const [showConfirm, setShowConfirm] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translateLang, setTranslateLang] = useState<string>('hi');
+  const [showLangPicker, setShowLangPicker] = useState(false);
+  const [translatedLangLabel, setTranslatedLangLabel] = useState<string>('');
+
+  const LANGUAGES = [
+    { code: 'hi', label: 'Hindi', native: 'हिंदी' },
+    { code: 'en', label: 'English', native: 'English' },
+    { code: 'fr', label: 'French', native: 'Français' },
+    { code: 'de', label: 'German', native: 'Deutsch' },
+    { code: 'es', label: 'Spanish', native: 'Español' },
+    { code: 'ja', label: 'Japanese', native: '日本語' },
+    { code: 'ko', label: 'Korean', native: '한국어' },
+    { code: 'ar', label: 'Arabic', native: 'العربية' },
+    { code: 'zh', label: 'Chinese', native: '中文' },
+    { code: 'pt', label: 'Portuguese', native: 'Português' },
+  ];
+
+  const handleTranslate = async (langCode?: string) => {
+    const targetLang = langCode || translateLang;
+    setShowLangPicker(false);
+
+    if (translatedText && !langCode) {
+      setTranslatedText(null);
+      setTranslatedLangLabel('');
+      return;
+    }
+
+    if (!message.content || message.content.startsWith('U2FsdGVkX1') || message.content.startsWith('📷') || message.content.startsWith('🎤')) {
+      return;
+    }
+
+    try {
+      setIsTranslating(true);
+      setTranslateLang(targetLang);
+      const lang = LANGUAGES.find(l => l.code === targetLang);
+      const response = await fetch(`${SOCKET_URL}/api/ai/translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message.content, targetLang }),
+      });
+      const data = await response.json();
+      if (data.translatedText) {
+        setTranslatedText(data.translatedText);
+        setTranslatedLangLabel(lang?.native || lang?.label || targetLang);
+      } else {
+        setTranslatedText(data.message || "Translation failed");
+        setTranslatedLangLabel('');
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      setTranslatedText("Translation failed \u2014 check connection");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   useEffect(() => {
     if (message.is_disappearing && message.expires_at) {
@@ -161,6 +218,33 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
             <button onClick={onForward} className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-all" title="Forward">
               <Share2 className="w-3.5 h-3.5" />
             </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowLangPicker(!showLangPicker)} 
+                disabled={isTranslating}
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${translatedText ? "text-rose-400 bg-rose-500/10" : "text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-500/10"} ${isTranslating ? "animate-spin" : ""}`} 
+                title={translatedText ? "Show Original" : "Translate"}
+              >
+                <Languages className="w-3.5 h-3.5" />
+              </button>
+              {showLangPicker && (
+                <div className={`absolute bottom-full mb-2 ${isOwn ? 'right-0' : 'left-0'} z-50 animate-pop-in`}>
+                  <div className="bg-secondary/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl p-1.5 min-w-[140px] max-h-[200px] overflow-y-auto">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-rose-400/70 px-2 py-1">Translate to</p>
+                    {LANGUAGES.map(lang => (
+                      <button
+                        key={lang.code}
+                        onClick={() => handleTranslate(lang.code)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-rose-500/10 transition-all group"
+                      >
+                        <span className="text-[11px] font-bold text-foreground/80 group-hover:text-foreground">{lang.label}</span>
+                        <span className="text-[9px] text-muted-foreground/50 ml-auto">{lang.native}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowConfirm(true)}
               className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
@@ -340,9 +424,39 @@ const MessageBubble = ({ message, isOwn, onDelete, onDeleteForMe, onReply, onEdi
             </button>
           )}
           {!isImageOnly && !isAudioOnly && !isDocOnly && !isCallOnly && (
-            <p className={`text-sm leading-relaxed font-medium break-words whitespace-pre-wrap ${hasImage ? "px-3 py-2" : hasAudio || hasDoc ? "mt-2 px-1" : ""}`}>
-              {message.content}
-            </p>
+            <div className={`flex flex-col ${hasImage ? "px-3 py-2" : hasAudio || hasDoc ? "mt-2 px-1" : ""}`}>
+              <p className={`text-sm leading-relaxed font-medium break-words whitespace-pre-wrap`}>
+                {message.content}
+              </p>
+              {translatedText && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  className="mt-2.5 rounded-xl bg-rose-500/[0.06] border border-rose-500/[0.12] p-2.5 backdrop-blur-sm"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded-full bg-rose-500/20 flex items-center justify-center">
+                        <Languages className="w-2.5 h-2.5 text-rose-400" />
+                      </div>
+                      <span className="text-[9px] font-extrabold uppercase tracking-[0.15em] text-rose-300">
+                        {translatedLangLabel || 'Translation'}
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => { setTranslatedText(null); setTranslatedLangLabel(''); }}
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-muted-foreground/40 hover:text-foreground transition-colors"
+                    >
+                      <span className="text-[10px]">×</span>
+                    </button>
+                  </div>
+                  <p className="text-[13px] leading-relaxed font-medium text-foreground/90 pl-[22px]">
+                    {translatedText}
+                  </p>
+                </motion.div>
+              )}
+            </div>
           )}
           {/* Reactions inside or attached to the bubble */}
           {message.reactions && message.reactions.length > 0 && (
